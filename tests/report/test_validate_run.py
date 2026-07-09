@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "tools" / "report"))
 
 import validate_run
+import summarize_phase0
 
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "artifacts" / "transport-smoke"
@@ -51,6 +52,44 @@ class ValidateRunTests(unittest.TestCase):
 
     def test_fixture_is_valid(self) -> None:
         validate_run.validate_artifact_set(FIXTURE)
+
+    def test_summary_marks_fixture_predictions_as_local_report_plumbing(self) -> None:
+        summary, exit_code = summarize_phase0.run_summary(FIXTURE)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("| Validity | loopback-only |", summary)
+        self.assertIn("transport-derived upper-bound simulations", summary)
+        self.assertIn("not final model throughput claims", summary)
+        self.assertIn("not target A/B/C hardware evidence", summary)
+        self.assertIn("report-plumbing signals only", summary)
+
+    def test_summary_requires_confirmed_hardware_interpretation_for_cluster_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["environment"]["network_path"] = "Thunderbolt Bridge"
+                data["environment"]["transport_mode"] = "real_cluster"
+                data["environment"]["socket_mode"] = "tcp_network"
+                data["environment"]["loopback"] = False
+                data["environment"]["hardware_interpretable"] = False
+                data["environment"]["confirmed_network_path"] = ""
+                data["scenario"]["kind"] = "real_cluster"
+
+            self.mutate_run_json(run_dir, mutate)
+            summary, exit_code = summarize_phase0.run_summary(run_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertIn("| Validity | not hardware-interpretable |", summary)
+            self.assertIn("not hardware-interpretable target A/B/C evidence", summary)
+
+            def mark_confirmed(data):
+                data["environment"]["hardware_interpretable"] = True
+                data["environment"]["confirmed_network_path"] = "Thunderbolt Bridge"
+
+            self.mutate_run_json(run_dir, mark_confirmed)
+            summary, exit_code = summarize_phase0.run_summary(run_dir)
+            self.assertEqual(exit_code, 0)
+            self.assertIn("| Validity | hardware-cluster |", summary)
+            self.assertIn("does not measure final model performance", summary)
 
     def test_missing_network_path_is_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_raw:

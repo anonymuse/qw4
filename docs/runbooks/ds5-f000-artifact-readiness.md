@@ -35,6 +35,34 @@ fixture evidence remain scaffolding only.
 | Projected decode impact | Every remote expert rate must include local rate, bytes per simulated token, simulated transport time, scheduler overhead input, formula text, and upper-bound tokens/sec. | Ready for validation. |
 | Hardware interpretation | `hardware_interpretable` requires `scenario.kind = real_cluster` and a non-empty confirmed network path. | Ready for validation. |
 
+## Local MacBook Rehearsal
+
+Use this sequence when only a local development machine is available. It
+exercises fixture validation, report formatting, and test coverage without
+creating target A/B/C transport evidence.
+
+```bash
+git status --short --branch
+python3 --version
+python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke
+python3 tools/report/summarize_phase0.py tests/fixtures/artifacts/transport-smoke
+make test
+git diff --check
+```
+
+Expected local-only interpretation:
+
+- `validate_run.py` reports the fixture conforms to `phase0.artifacts.v1`;
+- `summarize_phase0.py` reports `Validity` as `loopback-only`;
+- remote expert-rate sensitivity rows are described as transport-derived upper
+  bounds, not final model throughput;
+- no generated or fixture artifact is cited as A/B/C, Thunderbolt, RDMA-style,
+  or target-hardware evidence.
+
+If this rehearsal fails, fix artifact/report plumbing before scheduling the
+target run. If it passes, record the validation result in the active board or a
+local-only finding note, while leaving DS5-F000's go/no-go status unchanged.
+
 ## Preflight On All Nodes
 
 Run these commands on A, B, and C and save output into the run notes:

@@ -170,13 +170,35 @@ def classify_transport(run: dict[str, Any]) -> tuple[str, str]:
         "link.path",
     )
     loopback = get_path(run, "loopback", "transport.loopback", "network.loopback")
-    validity = get_path(run, "validity", "validity.status", "run_validity", "status", "valid")
+    run_valid = get_path(run, "valid")
+    hardware_interpretable = get_path(run, "environment.hardware_interpretable", "hardware_interpretable")
+    scenario_kind = value_or_missing(get_path(run, "scenario.kind", "scenario_kind")).lower()
+    confirmed_path = value_or_missing(get_path(run, "environment.confirmed_network_path")).strip()
 
     path_text = value_or_missing(path)
-    validity_text = value_or_missing(validity)
     path_lower = path_text.lower()
-    if loopback is True or "loopback" in path_lower or "127.0.0.1" in path_lower:
+    transport_mode = value_or_missing(get_path(run, "environment.transport_mode", "transport_mode")).lower()
+    socket_mode = value_or_missing(get_path(run, "environment.socket_mode", "socket_mode")).lower()
+    is_local = (
+        loopback is True
+        or "loopback" in path_lower
+        or "localhost" in path_lower
+        or "127.0.0.1" in path_lower
+        or "localhost" in transport_mode
+        or "localhost" in socket_mode
+        or scenario_kind in {"synthetic", "loopback", "socket_localhost"}
+    )
+
+    if run_valid is False:
+        validity_text = "invalid"
+    elif is_local:
         validity_text = "loopback-only"
+    elif hardware_interpretable is True and scenario_kind == "real_cluster" and confirmed_path:
+        validity_text = "hardware-cluster"
+    elif hardware_interpretable is False:
+        validity_text = "not hardware-interpretable"
+    else:
+        validity_text = value_or_missing(get_path(run, "validity", "validity.status", "run_validity", "status", "valid"))
     return path_text, validity_text
 
 
@@ -384,9 +406,13 @@ def run_summary(run_dir: Path) -> tuple[str, int]:
         lines.append(
             "This run is loopback-only. It can exercise artifact and scheduler paths, but it is not evidence for cluster hardware transport."
         )
+    elif validity_text == "hardware-cluster":
+        lines.append(
+            "This summary reports Phase 0 transport and simulated-MoE measurements only. It does not measure final model performance."
+        )
     else:
         lines.append(
-            "This summary reports transport and simulated-MoE measurements only. It does not measure final model performance."
+            "This run is not hardware-interpretable target A/B/C evidence. Treat it as artifact/report plumbing unless validation and run notes prove otherwise."
         )
     lines.append("")
     lines.append("## Latency Percentiles")
@@ -462,6 +488,14 @@ def run_summary(run_dir: Path) -> tuple[str, int]:
     lines.append("")
     sensitivity = sensitivity_rows(run)
     if sensitivity:
+        lines.append(
+            "These rows are transport-derived upper-bound simulations; they are not final model throughput claims."
+        )
+        if validity_text != "hardware-cluster":
+            lines.append(
+                "Because this run is not target A/B/C hardware evidence, treat these values as report-plumbing signals only."
+            )
+        lines.append("")
         lines.extend(
             table(
                 [
