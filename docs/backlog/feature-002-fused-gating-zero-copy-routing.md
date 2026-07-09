@@ -24,11 +24,13 @@ Existing implementation signals:
 
 - `src/transport/root.zig` contains Phase 0 frame/transport machinery.
 - `benchmarks/scenarios/qwen3_moe_transport_smoke.toml` contains synthetic Qwen-shaped traffic.
+- Phase 0 routing-payload schema fixtures may validate Qwen-shaped record assumptions for `DS5-F000`, but they are preparatory artifacts only.
 - No Thunderbolt-specific zero-copy implementation or fused routing packet exists yet.
 
 Prerequisite:
 
 - Complete `DS5-F000` with target-hardware transport artifacts before implementing fused routing. Loopback or scaffold results may inform this feature, but they do not unblock it.
+- Complete `DS5-F001A` placement-contract hardening before treating any routing payload assumption as ready for runtime integration.
 
 ## Rigid Acceptance Criteria
 

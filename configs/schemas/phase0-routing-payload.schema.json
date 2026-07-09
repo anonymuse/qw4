@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ds5.local/configs/schemas/phase0-routing-payload.schema.json",
+  "title": "DS5 Phase 0 routing-payload scaffold manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "feature_id",
+    "model",
+    "topology",
+    "packet_contract",
+    "zero_copy_assumptions",
+    "blocks",
+    "artifact_policy",
+    "limits_of_claim"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "const": "ds5.phase0_routing_payload_manifest.v1"
+    },
+    "feature_id": {
+      "const": "DS5-F000"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "variant",
+        "layers",
+        "experts",
+        "active_experts"
+      ],
+      "properties": {
+        "name": {
+          "const": "Qwen3-235B-A22B"
+        },
+        "variant": {
+          "const": "Qwen3-235B-A22B-Instruct-2507"
+        },
+        "layers": {
+          "const": 94
+        },
+        "experts": {
+          "const": 128
+        },
+        "active_experts": {
+          "const": 8
+        }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinator",
+        "compute_workers",
+        "layer_owners"
+      ],
+      "properties": {
+        "coordinator": {
+          "const": "A"
+        },
+        "compute_workers": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "B",
+              "C"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "layer_owners": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node",
+              "start_layer",
+              "end_layer"
+            ],
+            "properties": {
+              "node": {
+                "enum": [
+                  "B",
+                  "C"
+                ]
+              },
+              "start_layer": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 93
+              },
+              "end_layer": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 93
+              }
+            }
+          }
+        }
+      }
+    },
+    "packet_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_shape",
+        "block_packet_semantics",
+        "encoding_status",
+        "checksum_required",
+        "replay_protection_required",
+        "runtime_packet_implemented"
+      ],
+      "properties": {
+        "record_shape": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "layer_id"
+            },
+            {
+              "const": "active_expert_ids"
+            },
+            {
+              "const": "weight_coefficients"
+            },
+            {
+              "const": "target_nodes"
+            }
+          ],
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "block_packet_semantics": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding_status": {
+          "const": "json_contract_only"
+        },
+        "checksum_required": {
+          "const": true
+        },
+        "replay_protection_required": {
+          "const": true
+        },
+        "runtime_packet_implemented": {
+          "const": false
+        }
+      }
+    },
+    "zero_copy_assumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "runtime_implemented",
+        "measured_copy_counts_available",
+        "hot_path_heap_to_heap_copy_budget",
+        "buffer_ownership",
+        "requires_future_validation"
+      ],
+      "properties": {
+        "evidence_class": {
+          "const": "scaffold/planning"
+        },
+        "runtime_implemented": {
+          "const": false
+        },
+        "measured_copy_counts_available": {
+          "const": false
+        },
+        "hot_path_heap_to_heap_copy_budget": {
+          "const": 0
+        },
+        "buffer_ownership": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requires_future_validation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "sequence",
+          "routing_records"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "routing_records": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "layer_id",
+                "active_expert_ids",
+                "weight_coefficients",
+                "target_nodes"
+              ],
+              "properties": {
+                "layer_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 93
+                },
+                "active_expert_ids": {
+                  "type": "array",
+                  "minItems": 8,
+                  "maxItems": 8,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 127
+                  }
+                },
+                "weight_coefficients": {
+                  "type": "array",
+                  "minItems": 8,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "target_nodes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "B",
+                      "C"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifact_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routing_artifact_schema_version",
+        "default_artifact_path",
+        "default_summary_path"
+      ],
+      "properties": {
+        "routing_artifact_schema_version": {
+          "const": "ds5.phase0_routing_payload_artifact.v1"
+        },
+        "default_artifact_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default_summary_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "limits_of_claim": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

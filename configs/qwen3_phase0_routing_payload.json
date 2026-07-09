@@ -1,0 +1,187 @@
+{
+  "$schema": "schemas/phase0-routing-payload.schema.json",
+  "schema_version": "ds5.phase0_routing_payload_manifest.v1",
+  "feature_id": "DS5-F000",
+  "model": {
+    "name": "Qwen3-235B-A22B",
+    "variant": "Qwen3-235B-A22B-Instruct-2507",
+    "layers": 94,
+    "experts": 128,
+    "active_experts": 8
+  },
+  "topology": {
+    "coordinator": "A",
+    "compute_workers": [
+      "B",
+      "C"
+    ],
+    "layer_owners": [
+      {
+        "node": "B",
+        "start_layer": 0,
+        "end_layer": 46
+      },
+      {
+        "node": "C",
+        "start_layer": 47,
+        "end_layer": 93
+      }
+    ]
+  },
+  "packet_contract": {
+    "record_shape": [
+      "layer_id",
+      "active_expert_ids",
+      "weight_coefficients",
+      "target_nodes"
+    ],
+    "block_packet_semantics": "A Phase 0 synthetic transport block may carry an ordered sequence of Qwen-shaped top-8 routing records for payload-shape validation.",
+    "encoding_status": "json_contract_only",
+    "checksum_required": true,
+    "replay_protection_required": true,
+    "runtime_packet_implemented": false
+  },
+  "zero_copy_assumptions": {
+    "evidence_class": "scaffold/planning",
+    "runtime_implemented": false,
+    "measured_copy_counts_available": false,
+    "hot_path_heap_to_heap_copy_budget": 0,
+    "buffer_ownership": [
+      "Coordinator A owns the immutable routing payload until all targeted workers acknowledge receipt.",
+      "Workers B and C consume routing payload views without claiming ownership of coordinator memory.",
+      "Future transport telemetry must count staging, frame, checksum, and worker-ingress copies before any zero-copy claim."
+    ],
+    "requires_future_validation": [
+      "copy-count telemetry in the transport hot path",
+      "checksum behavior for Phase 0 routing-payload bytes",
+      "per-block synchronization timing on non-loopback A/B/C hardware",
+      "replay and out-of-order rejection in the runtime packet decoder"
+    ]
+  },
+  "blocks": [
+    {
+      "block_id": "phase0-routing-block-0001",
+      "sequence": 0,
+      "routing_records": [
+        {
+          "layer_id": 0,
+          "active_expert_ids": [
+            0,
+            8,
+            16,
+            24,
+            32,
+            40,
+            48,
+            56
+          ],
+          "weight_coefficients": [
+            0.22,
+            0.18,
+            0.15,
+            0.13,
+            0.11,
+            0.09,
+            0.07,
+            0.05
+          ],
+          "target_nodes": [
+            "B"
+          ]
+        },
+        {
+          "layer_id": 46,
+          "active_expert_ids": [
+            7,
+            15,
+            23,
+            31,
+            39,
+            47,
+            55,
+            63
+          ],
+          "weight_coefficients": [
+            0.2,
+            0.18,
+            0.16,
+            0.14,
+            0.12,
+            0.09,
+            0.07,
+            0.04
+          ],
+          "target_nodes": [
+            "B"
+          ]
+        },
+        {
+          "layer_id": 47,
+          "active_expert_ids": [
+            64,
+            72,
+            80,
+            88,
+            96,
+            104,
+            112,
+            120
+          ],
+          "weight_coefficients": [
+            0.21,
+            0.17,
+            0.15,
+            0.13,
+            0.12,
+            0.1,
+            0.07,
+            0.05
+          ],
+          "target_nodes": [
+            "C"
+          ]
+        },
+        {
+          "layer_id": 93,
+          "active_expert_ids": [
+            3,
+            19,
+            35,
+            51,
+            67,
+            83,
+            99,
+            115
+          ],
+          "weight_coefficients": [
+            0.19,
+            0.17,
+            0.15,
+            0.14,
+            0.12,
+            0.1,
+            0.08,
+            0.05
+          ],
+          "target_nodes": [
+            "B",
+            "C"
+          ]
+        }
+      ]
+    }
+  ],
+  "artifact_policy": {
+    "routing_artifact_schema_version": "ds5.phase0_routing_payload_artifact.v1",
+    "default_artifact_path": "artifacts/routing/phase0-routing-payload.json",
+    "default_summary_path": "docs/findings/phase0-routing-payload-scaffold.md"
+  },
+  "limits_of_claim": [
+    "This manifest validates synthetic Phase 0 routing payload shape and topology assumptions only.",
+    "It does not load Qwen weights or tokenizer assets.",
+    "It does not implement a fused runtime packet decoder, Metal kernels, a KV allocator, or a primary-weight loader.",
+    "It does not provide copy-count telemetry or benchmark evidence for a zero-copy transport path.",
+    "It preserves Qwen top-8 routing semantics and does not substitute topology-aware expert choices.",
+    "It does not unblock DS5-F002; DS5-F002 remains blocked until DS5-F001A and DS5-F000 are complete."
+  ]
+}
