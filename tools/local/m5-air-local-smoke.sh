@@ -3,6 +3,9 @@ set -eu
 
 RUN_DIR="${RUN_DIR:-artifacts/runs/m5-air-loopback-smoke}"
 MEMORY_JSON="${MEMORY_JSON:-/tmp/qwen3_memory_estimate.json}"
+ZIG_CACHE_DIR="${ZIG_CACHE_DIR:-/private/tmp/qw4-zig-cache}"
+ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-/private/tmp/qw4-zig-global-cache}"
+ZIG_PREFIX="${ZIG_PREFIX:-/private/tmp/qw4-zig-out}"
 
 CONFIG="configs/cluster.loopback.toml"
 SCENARIO="benchmarks/scenarios/loopback_transport_smoke.toml"
@@ -17,13 +20,17 @@ printf '%s\n' "M5 Air local smoke: loopback-only validation."
 printf '%s\n' "This does not claim Thunderbolt cluster, worker-node, or model inference performance."
 
 step "Zig build tests"
-zig build test
+zig build test --cache-dir "$ZIG_CACHE_DIR" --global-cache-dir "$ZIG_GLOBAL_CACHE_DIR" --prefix "$ZIG_PREFIX"
 
 step "Fixture artifact validation"
 python3 -B tools/report/validate_run.py "$FIXTURE_DIR"
 
 step "Loopback transport smoke"
-zig build run-coordinator -- \
+zig build run-coordinator \
+  --cache-dir "$ZIG_CACHE_DIR" \
+  --global-cache-dir "$ZIG_GLOBAL_CACHE_DIR" \
+  --prefix "$ZIG_PREFIX" \
+  -- \
   --config "$CONFIG" \
   --scenario "$SCENARIO" \
   --out "$RUN_DIR"

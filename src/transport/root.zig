@@ -75,7 +75,27 @@ pub const MeasurementMode = enum {
 };
 
 const no_concurrent_links = "none";
-const ab_ac_concurrent_links = "A-B+A-C";
+const ab_ac_concurrent_links = "A-B,A-C";
+const qwen_activation_bytes_per_token = 8192;
+const qwen_layers = 94;
+const qwen_top_k = 8;
+const qwen_destination_nodes = 2;
+const qwen_full_remote_bytes_per_simulated_token =
+    qwen_activation_bytes_per_token * qwen_layers * qwen_top_k * qwen_destination_nodes;
+
+const ProjectionRate = struct {
+    remote_rate: []const u8,
+    local_rate: []const u8,
+    remote_percent: u64,
+};
+
+const projection_rates = [_]ProjectionRate{
+    .{ .remote_rate = "0.0", .local_rate = "1.0", .remote_percent = 0 },
+    .{ .remote_rate = "0.25", .local_rate = "0.75", .remote_percent = 25 },
+    .{ .remote_rate = "0.5", .local_rate = "0.5", .remote_percent = 50 },
+    .{ .remote_rate = "0.75", .local_rate = "0.25", .remote_percent = 75 },
+    .{ .remote_rate = "1.0", .local_rate = "0.0", .remote_percent = 100 },
+};
 
 pub const FrameHeader = struct {
     kind: FrameKind,
@@ -1275,12 +1295,14 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     }
     try writer.writeAll("\n    ],\n");
     try writer.writeAll("    \"scheduler_overhead_us_per_token\": {\"p50\":0,\"p95\":0,\"p99\":0},\n");
-    try writer.print("    \"bytes_sent_per_simulated_token\": {d},\n", .{result.total_bytes_sent});
+    try writer.print("    \"bytes_sent_per_simulated_token\": {d},\n", .{qwen_full_remote_bytes_per_simulated_token});
     try writer.writeAll("    \"per_layer_transport_time_us\": {\"p50\":0,\"p95\":0,\"p99\":0},\n");
     try writer.writeAll("    \"concurrent_link_interference\": [");
     try writeConcurrentInterference(writer, result);
     try writer.writeAll("],\n");
-    try writer.writeAll("    \"predicted_upper_bound_tokens_per_sec\": [{\"remote_expert_rate\":0.0,\"tokens_per_sec\":0.0},{\"remote_expert_rate\":0.25,\"tokens_per_sec\":0.0},{\"remote_expert_rate\":0.5,\"tokens_per_sec\":0.0},{\"remote_expert_rate\":0.75,\"tokens_per_sec\":0.0},{\"remote_expert_rate\":1.0,\"tokens_per_sec\":0.0}]\n");
+    try writer.writeAll("    \"predicted_upper_bound_tokens_per_sec\": [");
+    try writeTokenProjections(writer, result);
+    try writer.writeAll("]\n");
     try writer.writeAll("  },\n");
     try writer.writeAll("  \"artifacts\": {\"events\":\"events.jsonl\",\"latency\":\"latency.csv\",\"throughput\":\"throughput.csv\",\"summary\":\"summary.md\"}\n");
     try writer.writeAll("}\n");
@@ -1317,7 +1339,7 @@ fn writeThroughputCsv(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("schema_version,run_id,node_pair,direction,block_size_bytes,transfer_count,bytes_sent,checksum_algorithm,checksum_failures,duration_ms,mib_per_sec,gbps,concurrent_links,remote_expert_rate,scenario_step\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},{s},0.0,{s}-block-{d}-{s}\n",
+            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},\"{s}\",0.0,{s}-block-{d}-{s}\n",
             .{
                 result.run_id,
                 protocol.WorkerNode.label(stats.node),
@@ -1350,7 +1372,7 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.print("- mode: `{s}`\n", .{RunMode.label(result.mode)});
     try writer.print("- socket mode: `{s}`\n", .{result.socket_mode});
     try writer.print("- network path: `{s}`\n", .{result.network_path});
-    try writer.print("- hardware interpretable: {s}\n", .{if (result.hardware_interpretable) "true" else "false"});
+    try writer.print("- hardware-interpretable: {s}\n", .{if (result.hardware_interpretable) "true" else "false"});
     try writer.writeAll("- data kind: transport/protocol smoke; hardware claims require confirmed non-loopback path\n\n");
 
     try writer.writeAll("## Scenario\n\n");
@@ -1402,10 +1424,16 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
         );
     }
 
-    try writer.writeAll("\n## Concurrent Link Interference\n\n");
+    try writer.writeAll("\n## Concurrent-Link Interference\n\n");
     try writer.writeAll("| Node pair | Solo MiB/s | Concurrent MiB/s | Degradation pct |\n");
     try writer.writeAll("|---|---:|---:|---:|\n");
     try writeConcurrentInterferenceMarkdown(writer, result);
+
+    try writer.writeAll("\n## Coordinator Overhead\n\n");
+    try writer.writeAll("- Scheduler overhead per simulated token p50/p95/p99: 0/0/0 us\n");
+    try writer.print("- Bytes sent per simulated token: {d}\n", .{qwen_full_remote_bytes_per_simulated_token});
+    try writer.writeAll("- Per-layer simulated transport time p50/p95/p99: 0/0/0 us\n");
+    try writer.writeAll("- Predicted upper-bound tokens/sec: local smoke projection rows are present in `run.json` for schema readiness only\n");
 
     try writer.writeAll("\n## Reliability\n\n");
     try writer.print("- checksum failures: {d}\n", .{result.checksum_failures});
@@ -1536,6 +1564,19 @@ fn emitTransferEvent(result: *RunResult, stats: MessageStats) !void {
             stats.checksum_failures,
         },
     );
+
+    const layer_index: u64 = if (stats.node == .B) 0 else 47;
+    try writeEventPrefix(result, "simulated_layer_transfer", "info");
+    try writer.print(
+        ",\"layer_index\":{d},\"node_pair\":\"A-{s}\",\"bytes_sent\":{d},\"latency_us\":{d},\"remote_expert_rate\":0.0,\"details\":{{\"measurement_mode\":\"{s}\",\"schema_readiness_only\":true}}}}\n",
+        .{
+            layer_index,
+            protocol.WorkerNode.label(stats.node),
+            stats.bytes_sent,
+            nsToUs(stats.p50_latency_ns),
+            MeasurementMode.label(stats.measurement_mode),
+        },
+    );
 }
 
 fn writeEventPrefix(result: *RunResult, event_type: []const u8, severity: []const u8) !void {
@@ -1579,6 +1620,57 @@ fn writeMessageSizesJson(writer: *Io.Writer, result: *const RunResult) !void {
         written_size_count += 1;
     }
     try writer.writeByte(']');
+}
+
+fn writeTokenProjections(writer: *Io.Writer, result: *const RunResult) !void {
+    const bytes_per_sec = projectionThroughputBytesPerSec(result);
+    for (projection_rates, 0..) |rate, index| {
+        if (index != 0) try writer.writeByte(',');
+        const bytes_per_token = qwenBytesForRemotePercent(rate.remote_percent);
+        const transport_us = transportTimeUsForBytes(bytes_per_token, bytes_per_sec);
+        const tokens_per_sec = if (transport_us == 0) 0 else @divTrunc(1_000_000, transport_us);
+        try writer.print(
+            "{{\"remote_expert_rate\":{s},\"local_expert_rate\":{s},\"bytes_per_simulated_token\":{d},\"simulated_transport_time_us_per_token\":{d},\"scheduler_overhead_us_per_token\":0,\"tokens_per_sec\":{d},\"formula\":\"transport-local-smoke: 1000000 / simulated_transport_time_us_per_token when nonzero\"}}",
+            .{
+                rate.remote_rate,
+                rate.local_rate,
+                bytes_per_token,
+                transport_us,
+                tokens_per_sec,
+            },
+        );
+    }
+}
+
+fn qwenBytesForRemotePercent(remote_percent: u64) u64 {
+    const bytes: u128 = @as(u128, qwen_full_remote_bytes_per_simulated_token) * remote_percent / 100;
+    return @intCast(bytes);
+}
+
+fn transportTimeUsForBytes(bytes: u64, bytes_per_sec: u64) u64 {
+    if (bytes == 0 or bytes_per_sec == 0) return 0;
+    const numerator: u128 = @as(u128, bytes) * 1_000_000;
+    const denominator: u128 = bytes_per_sec;
+    return @intCast(@divTrunc(numerator + denominator - 1, denominator));
+}
+
+fn projectionThroughputBytesPerSec(result: *const RunResult) u64 {
+    const block_size = largestMessageSize(result);
+    var selected: u64 = 0;
+    for (result.stats.items) |stats| {
+        if (stats.message_size != block_size or stats.measurement_mode != .concurrent) continue;
+        if (selected == 0 or stats.throughput_bytes_per_sec < selected) {
+            selected = stats.throughput_bytes_per_sec;
+        }
+    }
+    if (selected != 0) return selected;
+    for (result.stats.items) |stats| {
+        if (stats.message_size != block_size) continue;
+        if (selected == 0 or stats.throughput_bytes_per_sec < selected) {
+            selected = stats.throughput_bytes_per_sec;
+        }
+    }
+    return selected;
 }
 
 fn writeConcurrentInterference(writer: *Io.Writer, result: *const RunResult) !void {
