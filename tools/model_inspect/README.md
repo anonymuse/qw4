@@ -91,6 +91,8 @@ python3 tools/model_inspect/validate_phase0_routing_payload.py \
 ```
 
 This validates the exact top-8 routing record field shape, B/C target-node
-bounds, block ordering, and zero-copy assumptions as planning data only. It does
-not load weights, implement a production routing packet runtime, measure copy
-counts, make transport benchmark claims, or unblock DS5-F002.
+bounds, block ordering, and zero-copy design assumptions as unmeasured planning
+data only. The zero-copy copy budget is a future design target, not copy-count
+telemetry. The tool does not load weights, implement a production routing packet
+runtime, measure copy counts, make transport benchmark claims, or unblock
+DS5-F002.

@@ -164,6 +164,7 @@
     },
     "zero_copy_assumptions": {
       "type": "object",
+      "description": "Planning-only zero-copy assumptions. These fields must not be read as measured transport telemetry.",
       "additionalProperties": false,
       "required": [
         "evidence_class",
@@ -181,9 +182,11 @@
           "const": false
         },
         "measured_copy_counts_available": {
+          "description": "Must remain false until transport hot-path copy counts are measured.",
           "const": false
         },
         "hot_path_heap_to_heap_copy_budget": {
+          "description": "Unvalidated future design target, not observed copy-count telemetry.",
           "const": 0
         },
         "buffer_ownership": {
