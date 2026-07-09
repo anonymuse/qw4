@@ -1,0 +1,101 @@
+{
+  "$schema": "schemas/pdd-placement-manifest.schema.json",
+  "schema_version": "ds5.pdd_placement.v1",
+  "feature_id": "DS5-F001",
+  "model": {
+    "name": "Qwen3-235B-A22B",
+    "variant": "Qwen3-235B-A22B-Instruct-2507",
+    "layers": 94,
+    "experts": 128,
+    "active_experts": 8
+  },
+  "limits": {
+    "byte_unit": "decimal_gb",
+    "worker_memory_gb": 48.0,
+    "static_cap_fraction": 0.7,
+    "runtime_headroom_fraction": 0.3,
+    "static_cap_gb": 33.6,
+    "runtime_headroom_gb": 14.4
+  },
+  "nodes": [
+    {
+      "name": "A",
+      "role": "coordinator / prefill orchestration and correctness routing",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_headroom_gb": 14.4,
+      "owns_primary_moe_decode": false,
+      "decode_layer_ranges": [],
+      "static_memory": {
+        "primary_moe_decode_bytes": 0,
+        "dense_decode_bytes": 0,
+        "router_gate_mirror_bytes": 100000000,
+        "other_static_bytes": 200000000,
+        "total_static_bytes": 300000000
+      },
+      "notes": [
+        "Node A is not a primary MoE decode owner in this Phase 1 topology.",
+        "Router/gate mirror bytes are a stub budget for correctness-routing validation, not measured tensor metadata."
+      ]
+    },
+    {
+      "name": "B",
+      "role": "primary decode worker / lower layer shard",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_headroom_gb": 14.4,
+      "owns_primary_moe_decode": true,
+      "decode_layer_ranges": [
+        {
+          "start": 0,
+          "end": 46
+        }
+      ],
+      "static_memory": {
+        "primary_moe_decode_bytes": 28500000000,
+        "dense_decode_bytes": 2000000000,
+        "router_gate_mirror_bytes": 100000000,
+        "other_static_bytes": 400000000,
+        "total_static_bytes": 31000000000
+      },
+      "notes": [
+        "Owns inclusive decode layers 0-46.",
+        "Static byte buckets are Phase 1 cap-testing placeholders and do not claim a final quantization recipe."
+      ]
+    },
+    {
+      "name": "C",
+      "role": "primary decode worker / upper layer shard",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_headroom_gb": 14.4,
+      "owns_primary_moe_decode": true,
+      "decode_layer_ranges": [
+        {
+          "start": 47,
+          "end": 93
+        }
+      ],
+      "static_memory": {
+        "primary_moe_decode_bytes": 28500000000,
+        "dense_decode_bytes": 2000000000,
+        "router_gate_mirror_bytes": 100000000,
+        "other_static_bytes": 400000000,
+        "total_static_bytes": 31000000000
+      },
+      "notes": [
+        "Owns inclusive decode layers 47-93.",
+        "Static byte buckets are Phase 1 cap-testing placeholders and do not claim a final quantization recipe."
+      ]
+    }
+  ],
+  "artifact_policy": {
+    "memory_ledger_schema_version": "ds5.pdd_memory_ledger.v1",
+    "default_ledger_path": "artifacts/pdd/ds5-f001-memory-ledger.json"
+  },
+  "limits_of_claim": [
+    "This manifest validates topology and memory-budget scaffolding only.",
+    "It does not load Qwen weights, parse tokenizer assets, implement speculative decoding, or run Metal kernels.",
+    "Static byte buckets are placeholders until pinned tensor metadata and quantization accounting replace them."
+  ]
+}

@@ -2,6 +2,7 @@
 .zig-cache/
 zig-out/
 artifacts/runs/
+artifacts/pdd/
 *.log
 __pycache__/
 *.pyc

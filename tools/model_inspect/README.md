@@ -9,3 +9,11 @@ and byte offsets. They must not download checkpoints or load tensor payloads.
 Fields needed by the placement estimator are tracked in
 `docs/findings/placement-feasibility.md`.
 
+Validate the Phase 1 DS5-F001 PDD topology scaffold and emit a stub memory
+ledger with:
+
+```bash
+python3 tools/model_inspect/validate_pdd_topology.py \
+  --manifest configs/qwen3_pdd_topology_phase1.json \
+  --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json
+```
