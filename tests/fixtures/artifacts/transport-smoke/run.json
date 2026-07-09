@@ -13,6 +13,10 @@
   "environment": {
     "network_path": "synthetic-loopback",
     "clock_sync": "single-process fixture clock",
+    "transport_mode": "single_process_loopback",
+    "socket_mode": "in_process",
+    "loopback": true,
+    "confirmed_network_path": "",
     "hardware_interpretable": false
   },
   "scenario": {
@@ -119,6 +123,42 @@
       },
       {
         "node_pair": "A-B",
+        "message_size_bytes": 16384,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 310.0,
+        "p95_us": 390.0,
+        "p99_us": 445.0
+      },
+      {
+        "node_pair": "A-C",
+        "message_size_bytes": 16384,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 320.0,
+        "p95_us": 405.0,
+        "p99_us": 462.0
+      },
+      {
+        "node_pair": "A-B",
+        "message_size_bytes": 65536,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 590.0,
+        "p95_us": 720.0,
+        "p99_us": 810.0
+      },
+      {
+        "node_pair": "A-C",
+        "message_size_bytes": 65536,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 610.0,
+        "p95_us": 745.0,
+        "p99_us": 840.0
+      },
+      {
+        "node_pair": "A-B",
         "message_size_bytes": 1048576,
         "sample_count": 36,
         "checksum_failures": 0,
@@ -206,23 +246,48 @@
     "predicted_upper_bound_tokens_per_sec": [
       {
         "remote_expert_rate": 0.0,
-        "tokens_per_sec": 24.0
+        "local_expert_rate": 1.0,
+        "bytes_per_simulated_token": 25165824,
+        "simulated_transport_time_us_per_token": 41611.67,
+        "scheduler_overhead_us_per_token": 55.0,
+        "tokens_per_sec": 24.0,
+        "formula": "1000000 / (simulated_transport_time_us_per_token + scheduler_overhead_us_per_token)"
       },
       {
         "remote_expert_rate": 0.25,
-        "tokens_per_sec": 16.5
+        "local_expert_rate": 0.75,
+        "bytes_per_simulated_token": 25165824,
+        "simulated_transport_time_us_per_token": 60551.06,
+        "scheduler_overhead_us_per_token": 55.0,
+        "tokens_per_sec": 16.5,
+        "formula": "1000000 / (simulated_transport_time_us_per_token + scheduler_overhead_us_per_token)"
       },
       {
         "remote_expert_rate": 0.5,
-        "tokens_per_sec": 11.2
+        "local_expert_rate": 0.5,
+        "bytes_per_simulated_token": 25165824,
+        "simulated_transport_time_us_per_token": 89230.71,
+        "scheduler_overhead_us_per_token": 55.0,
+        "tokens_per_sec": 11.2,
+        "formula": "1000000 / (simulated_transport_time_us_per_token + scheduler_overhead_us_per_token)"
       },
       {
         "remote_expert_rate": 0.75,
-        "tokens_per_sec": 8.1
+        "local_expert_rate": 0.25,
+        "bytes_per_simulated_token": 25165824,
+        "simulated_transport_time_us_per_token": 123401.79,
+        "scheduler_overhead_us_per_token": 55.0,
+        "tokens_per_sec": 8.1,
+        "formula": "1000000 / (simulated_transport_time_us_per_token + scheduler_overhead_us_per_token)"
       },
       {
         "remote_expert_rate": 1.0,
-        "tokens_per_sec": 6.0
+        "local_expert_rate": 0.0,
+        "bytes_per_simulated_token": 25165824,
+        "simulated_transport_time_us_per_token": 166611.67,
+        "scheduler_overhead_us_per_token": 55.0,
+        "tokens_per_sec": 6.0,
+        "formula": "1000000 / (simulated_transport_time_us_per_token + scheduler_overhead_us_per_token)"
       }
     ]
   },

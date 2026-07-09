@@ -56,7 +56,7 @@ The reporting path works best when Agent B/C artifacts include:
 - throughput CSV columns for node pair, block size bytes, transfer count, and sustained throughput;
 - checksum algorithm, packets checked, failure count, and checksum-failure events;
 - scheduler overhead per simulated token, bytes per simulated token, and per-layer simulated transport time;
-- remote expert-rate sensitivity rows with remote expert rate, bytes per token, simulated transport time, and transport-derived upper-bound tokens/sec;
+- remote expert-rate sensitivity rows with remote expert rate, local expert rate, bytes per token, simulated transport time, scheduler overhead input, formula text, and transport-derived upper-bound tokens/sec;
 - event records with timestamp, event type, node ID, severity, retry count, timeout duration, bytes sent, bytes acknowledged, and validity impact.
 
 If a field is absent, reporting should show `not reported` rather than guessing.

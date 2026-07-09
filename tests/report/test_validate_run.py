@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import copy
+import csv
 import json
 import shutil
 import sys
@@ -30,6 +30,24 @@ class ValidateRunTests(unittest.TestCase):
         data = json.loads(path.read_text(encoding="utf-8"))
         mutator(data)
         path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    def mutate_events_jsonl(self, run_dir: Path, mutator) -> None:
+        path = run_dir / "events.jsonl"
+        events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        events = mutator(events)
+        path.write_text("\n".join(json.dumps(event, sort_keys=True) for event in events) + "\n", encoding="utf-8")
+
+    def mutate_csv(self, run_dir: Path, name: str, mutator) -> None:
+        path = run_dir / name
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            fieldnames = list(reader.fieldnames or [])
+            rows = list(reader)
+        rows = mutator(rows)
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
 
     def test_fixture_is_valid(self) -> None:
         validate_run.validate_artifact_set(FIXTURE)
@@ -76,6 +94,88 @@ class ValidateRunTests(unittest.TestCase):
 
             def mutate(data):
                 data["metrics"]["concurrent_link_interference"][0].pop("degradation_pct")
+
+            self.mutate_run_json(run_dir, mutate)
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_latency_metrics_must_cover_each_worker_pair_and_message_size(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["metrics"]["latency_by_message_size"] = [
+                    row
+                    for row in data["metrics"]["latency_by_message_size"]
+                    if not (row["node_pair"] == "A-C" and row["message_size_bytes"] == 65536)
+                ]
+
+            self.mutate_run_json(run_dir, mutate)
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_throughput_csv_requires_concurrent_a_b_a_c_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            self.mutate_csv(
+                run_dir,
+                "throughput.csv",
+                lambda rows: [row for row in rows if row["concurrent_links"] == "none"],
+            )
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_decode_projection_requires_formula_inputs_for_each_remote_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["metrics"]["predicted_upper_bound_tokens_per_sec"][2].pop("simulated_transport_time_us_per_token")
+
+            self.mutate_run_json(run_dir, mutate)
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_checksum_failure_count_requires_failed_checksum_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["checksums"]["passed"] = 79
+                data["checksums"]["failed"] = 1
+                data["checksums"]["status"] = "fail"
+
+            self.mutate_run_json(run_dir, mutate)
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_worker_health_is_required_for_each_worker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            self.mutate_events_jsonl(
+                run_dir,
+                lambda events: [
+                    event
+                    for event in events
+                    if not (event["event_type"] == "worker_health" and event.get("node_id") == "C")
+                ],
+            )
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
+    def test_hardware_interpretable_run_requires_confirmed_real_cluster_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["environment"]["network_path"] = "Thunderbolt Bridge"
+                data["environment"]["transport_mode"] = "real_cluster"
+                data["environment"]["socket_mode"] = "tcp_network"
+                data["environment"]["hardware_interpretable"] = True
+                data["environment"].pop("confirmed_network_path", None)
+                data["scenario"]["kind"] = "real_cluster"
 
             self.mutate_run_json(run_dir, mutate)
             with self.assertRaises(validate_run.ValidationError):

@@ -7,7 +7,8 @@
 - started_at: 2026-07-09T03:00:00Z
 - ended_at: 2026-07-09T03:00:05Z
 - valid: true
-- data kind: synthetic fixture, not real cluster data
+- hardware-interpretable: false
+- data kind: synthetic loopback fixture scaffolding, not real cluster data
 
 ## Scenario
 
@@ -31,6 +32,10 @@
 |---|---:|---:|---:|---:|
 | A-B | 4096 | 240.0 us | 310.0 us | 355.0 us |
 | A-C | 4096 | 245.0 us | 318.0 us | 366.0 us |
+| A-B | 16384 | 310.0 us | 390.0 us | 445.0 us |
+| A-C | 16384 | 320.0 us | 405.0 us | 462.0 us |
+| A-B | 65536 | 590.0 us | 720.0 us | 810.0 us |
+| A-C | 65536 | 610.0 us | 745.0 us | 840.0 us |
 | A-B | 1048576 | 2150.0 us | 2480.0 us | 2710.0 us |
 | A-C | 1048576 | 2190.0 us | 2525.0 us | 2765.0 us |
 
@@ -54,6 +59,10 @@ Concurrent-link interference at 4194304 bytes was 7.56 percent on A-B and
 - reconnects: 1
 - timeouts: 0
 - retry event: C heartbeat_gap recovered after one retry
+
+Scheduler overhead p50/p95/p99 was 38.0/55.0/72.0 us per simulated token.
+Bytes sent per simulated token: 25165824.
+Per-layer simulated transport time p50/p95/p99 was 2100.0/2480.0/2765.0 us.
 
 ## Interpretation
 

@@ -204,5 +204,5 @@ The reporting path needs the benchmark schema to provide at least:
 - health and failure events: event timestamp, event type, node, severity, retry count, timeout duration, bytes sent, bytes acknowledged;
 - checksum metrics: algorithm, packet count, failure count, failed packet IDs or event IDs when available;
 - scheduler metrics: overhead per simulated token, bytes per simulated token, per-layer simulated transport time;
-- simulated MoE sensitivity: remote expert rate, local expert rate, predicted upper-bound tokens/sec, and the formula inputs used to compute it;
+- simulated MoE sensitivity: remote expert rate, local expert rate, bytes per simulated token, simulated transport time per token, scheduler overhead input, predicted upper-bound tokens/sec, and the formula inputs used to compute it;
 - decision fields: go/no-go recommendation, invalidation reason if any, and links to generated figures or summary text.

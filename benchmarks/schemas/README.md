@@ -31,15 +31,20 @@ Required content:
 | `started_at`, `ended_at`, `duration_ms` | Run wall-clock bounds and elapsed duration. |
 | `valid` | Whether the run may be interpreted for technical findings. |
 | `environment` | Network path, clock sync note, and whether results are real hardware data. |
-| `scenario` | Scenario name, config path, message sizes, block sizes, transfer counts, checksum mode, and Qwen-shaped MoE parameters. |
+| `scenario` | Scenario name, config path, message sizes, block sizes, transfer counts, checksum mode, and DS5-F000 Qwen-shaped MoE parameters. |
 | `nodes` | Node IDs, roles, hostnames or stable labels, hardware labels, and transport labels. |
 | `checksums` | Algorithm, total transfers, passed/failed counts, and status. |
 | `failure_counts` | Count of failures, retries, reconnects, and timeouts. |
-| `metrics` | Required latency, throughput, scheduler, per-layer, concurrent-link, and predicted token/sec metrics. |
+| `metrics` | Required latency, throughput, scheduler, per-layer, concurrent-link, and projected decode-impact metrics. |
 | `artifacts` | File names for the other four artifacts. |
 
 The schema is intentionally strict. Missing required metrics should fail
 validation instead of becoming empty report cells.
+
+For `phase0.artifacts.v1`, the Qwen-shaped scenario is fixed to the DS5-F000
+shape from the minimum viable finding: 94 layers, hidden size 4096, top-8
+experts, one packet per destination per layer, worker B owning layers 0-46, and
+worker C owning layers 47-93.
 
 ## `events.jsonl`
 
@@ -153,7 +158,12 @@ Minimum facts:
 - sustained throughput summary;
 - checksum failure count;
 - failure, retry, reconnect, and timeout counts;
+- scheduler overhead per simulated token;
+- bytes sent per simulated token;
+- per-layer simulated transport time;
+- concurrent-link interference;
 - predicted upper-bound tokens/sec by remote-expert-rate scenario;
+- whether `hardware_interpretable` is true or false;
 - whether the result is synthetic, loopback, or real cluster data.
 
 ## Validation
@@ -166,6 +176,25 @@ python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke
 
 The validator intentionally duplicates the v1 contract in Python instead of
 depending on a third-party JSON Schema package.
+
+The validator is also the DS5-F000 semantic gate. In addition to required file
+and field shapes, it checks that:
+
+- node A is present as coordinator and nodes B/C are present as workers;
+- latency metrics and `latency.csv` cover every scenario message size for both
+  A-B and A-C;
+- throughput metrics and solo `throughput.csv` rows cover every scenario block
+  size for both A-B and A-C;
+- concurrent `throughput.csv` rows and run-level interference metrics cover
+  simultaneous A-B/A-C traffic;
+- checksum, retry, reconnect, timeout, discovery, and worker-health counters are
+  backed by matching events;
+- projected decode-impact rows cover every remote expert rate and include local
+  expert rate, bytes per simulated token, simulated transport time per token,
+  scheduler overhead input, formula text, and transport-derived upper-bound
+  tokens/sec;
+- hardware-interpretable runs require `scenario.kind = real_cluster` and a
+  non-empty confirmed network path.
 
 ## Provisional Fields
 
