@@ -8,7 +8,7 @@ const protocol = common.protocol;
 const net = std.Io.net;
 
 pub const header_len = 54;
-pub const max_payload_bytes = 16 * 1024 * 1024;
+pub const max_payload_bytes = 256 * 1024 * 1024;
 
 const magic = [_]u8{ 'D', 'S', '5', 'L' };
 const version: u8 = 1;
@@ -22,6 +22,60 @@ pub const FrameKind = enum(u8) {
     ack = 6,
     transport_error = 7,
 };
+
+pub const WorkerPair = enum {
+    a_b,
+    a_c,
+
+    pub fn parse(value: []const u8) ?WorkerPair {
+        if (std.mem.eql(u8, value, "A-B")) return .a_b;
+        if (std.mem.eql(u8, value, "A-C")) return .a_c;
+        return null;
+    }
+
+    pub fn label(pair: WorkerPair) []const u8 {
+        return switch (pair) {
+            .a_b => "A-B",
+            .a_c => "A-C",
+        };
+    }
+};
+
+pub const ConcurrencyMode = enum {
+    a_b,
+    a_c,
+    a_b_and_a_c,
+
+    pub fn parse(value: []const u8) ?ConcurrencyMode {
+        if (std.mem.eql(u8, value, "A-B")) return .a_b;
+        if (std.mem.eql(u8, value, "A-C")) return .a_c;
+        if (std.mem.eql(u8, value, "A-B-and-A-C")) return .a_b_and_a_c;
+        return null;
+    }
+
+    pub fn label(mode: ConcurrencyMode) []const u8 {
+        return switch (mode) {
+            .a_b => "A-B",
+            .a_c => "A-C",
+            .a_b_and_a_c => "A-B-and-A-C",
+        };
+    }
+};
+
+pub const MeasurementMode = enum {
+    solo,
+    concurrent,
+
+    pub fn label(mode: MeasurementMode) []const u8 {
+        return switch (mode) {
+            .solo => "solo",
+            .concurrent => "concurrent",
+        };
+    }
+};
+
+const no_concurrent_links = "none";
+const ab_ac_concurrent_links = "A-B+A-C";
 
 pub const FrameHeader = struct {
     kind: FrameKind,
@@ -43,13 +97,58 @@ pub const DecodedFrame = struct {
 pub const Scenario = struct {
     name: []const u8,
     message_sizes: std.ArrayList(usize),
+    transfer_counts_by_message_size: std.ArrayList(usize),
     transfer_count: usize,
     warmup_count: usize,
+    concurrency: usize,
+    concurrency_modes: std.ArrayList(ConcurrencyMode),
+    run_pairs_concurrently: bool,
+    worker_pairs: std.ArrayList(WorkerPair),
     payload_seed: u64,
 
     pub fn deinit(self: *Scenario, allocator: std.mem.Allocator) void {
         self.message_sizes.deinit(allocator);
+        self.transfer_counts_by_message_size.deinit(allocator);
+        self.concurrency_modes.deinit(allocator);
+        self.worker_pairs.deinit(allocator);
         self.* = undefined;
+    }
+
+    pub fn transferCountForIndex(self: *const Scenario, index: usize) usize {
+        if (self.transfer_counts_by_message_size.items.len != 0) {
+            return self.transfer_counts_by_message_size.items[index];
+        }
+        return self.transfer_count;
+    }
+
+    pub fn maxTransferCount(self: *const Scenario) usize {
+        var max_count = self.transfer_count;
+        for (self.transfer_counts_by_message_size.items) |count| {
+            max_count = @max(max_count, count);
+        }
+        return max_count;
+    }
+
+    pub fn hasWorkerPair(self: *const Scenario, pair: WorkerPair) bool {
+        if (self.worker_pairs.items.len == 0) return true;
+        for (self.worker_pairs.items) |candidate| {
+            if (candidate == pair) return true;
+        }
+        return false;
+    }
+
+    pub fn hasConcurrencyMode(self: *const Scenario, mode: ConcurrencyMode) bool {
+        for (self.concurrency_modes.items) |candidate| {
+            if (candidate == mode) return true;
+        }
+        return false;
+    }
+
+    pub fn requestsConcurrentABAC(self: *const Scenario) bool {
+        if (!self.hasWorkerPair(.a_b) or !self.hasWorkerPair(.a_c)) return false;
+        return self.run_pairs_concurrently or
+            self.concurrency >= 2 or
+            self.hasConcurrencyMode(.a_b_and_a_c);
     }
 };
 
@@ -82,6 +181,8 @@ pub const MessageStats = struct {
     node: protocol.WorkerNode,
     message_size: usize,
     transfer_count: usize,
+    measurement_mode: MeasurementMode,
+    concurrent_links: []const u8,
     bytes_sent: u64,
     bytes_received: u64,
     checksum_failures: u64,
@@ -267,30 +368,53 @@ fn runNetworkSmoke(
     scenario: Scenario,
     result: *RunResult,
 ) !void {
+    var sessions: [2]NetworkSession = undefined;
+    var session_count: usize = 0;
+    errdefer closeNetworkSessions(io, sessions[0..session_count]);
+
     for (cluster.workerEndpoints()) |endpoint| {
-        var stream = try connectToEndpointWithReconnect(io, endpoint, cluster, result);
-        defer stream.close(io);
+        if (session_count >= sessions.len) return error.TooManyWorkers;
+        sessions[session_count] = .{
+            .endpoint = endpoint,
+            .stream = try connectToEndpointWithReconnect(io, endpoint, cluster, result),
+        };
+        session_count += 1;
+    }
 
-        var reader_buffer: [64 * 1024]u8 = undefined;
-        var writer_buffer: [64 * 1024]u8 = undefined;
-        var stream_reader = stream.reader(io, &reader_buffer);
-        var stream_writer = stream.writer(io, &writer_buffer);
+    for (sessions[0..session_count]) |*session| {
+        try emitNodeDiscoveredEvent(result, session.endpoint.node, session.endpoint.address, 0);
+        try pingWorkerOnStream(allocator, io, session.endpoint.node, &session.stream, result);
+    }
 
-        try emitNodeDiscoveredEvent(result, endpoint.node, endpoint.address, 0);
-        try pingWorker(allocator, io, endpoint.node, &stream_reader.interface, &stream_writer.interface, result);
+    for (sessions[0..session_count]) |*session| {
         try runWorkerTraffic(
             allocator,
             io,
-            endpoint.node,
+            session.endpoint.node,
             scenario,
-            &stream_reader.interface,
-            &stream_writer.interface,
+            &session.stream,
             result,
         );
-        try writeFrame(&stream_writer.interface, .shutdown, 0, &.{});
-        var ack = try readFrame(allocator, &stream_reader.interface);
-        defer ack.deinit(allocator);
-        if (ack.header.kind != .ack) return error.InvalidWorkerResponse;
+    }
+
+    if (scenario.requestsConcurrentABAC()) {
+        try runConcurrentNetworkTraffic(allocator, io, scenario, sessions[0..session_count], result);
+    }
+
+    for (sessions[0..session_count]) |*session| {
+        try shutdownWorkerSession(allocator, io, &session.stream);
+    }
+    closeNetworkSessions(io, sessions[0..session_count]);
+}
+
+const NetworkSession = struct {
+    endpoint: WorkerEndpoint,
+    stream: net.Stream,
+};
+
+fn closeNetworkSessions(io: Io, sessions: []NetworkSession) void {
+    for (sessions) |*session| {
+        session.stream.close(io);
     }
 }
 
@@ -316,7 +440,11 @@ fn allWorkerEndpointsAreLocal(cluster: ClusterConfig) bool {
 }
 
 fn isLocalEndpoint(address: []const u8) bool {
-    return std.mem.startsWith(u8, address, "127.0.0.1:") or
+    return std.mem.eql(u8, address, "127.0.0.1") or
+        std.mem.eql(u8, address, "localhost") or
+        std.mem.eql(u8, address, "::1") or
+        std.mem.eql(u8, address, "[::1]") or
+        std.mem.startsWith(u8, address, "127.0.0.1:") or
         std.mem.startsWith(u8, address, "localhost:") or
         std.mem.startsWith(u8, address, "[::1]:") or
         std.mem.startsWith(u8, address, "::1:");
@@ -362,6 +490,9 @@ fn runSingleProcessSmoke(
         try emitNodeDiscoveredEvent(result, endpoint.node, endpoint.address, 0);
         try pingWorkerInProcess(allocator, io, endpoint.node, result);
         try runInProcessTraffic(allocator, io, endpoint.node, scenario, result);
+    }
+    if (scenario.requestsConcurrentABAC()) {
+        try runConcurrentInProcessTraffic(allocator, io, scenario, result);
     }
 }
 
@@ -411,6 +542,20 @@ fn pingWorker(
     try emitWorkerHealthEvent(result, node, nsSince(start, end));
 }
 
+fn pingWorkerOnStream(
+    allocator: std.mem.Allocator,
+    io: Io,
+    node: protocol.WorkerNode,
+    stream: *net.Stream,
+    result: *RunResult,
+) !void {
+    var reader_buffer: [64 * 1024]u8 = undefined;
+    var writer_buffer: [64 * 1024]u8 = undefined;
+    var stream_reader = stream.*.reader(io, &reader_buffer);
+    var stream_writer = stream.*.writer(io, &writer_buffer);
+    try pingWorker(allocator, io, node, &stream_reader.interface, &stream_writer.interface, result);
+}
+
 fn pingWorkerInProcess(
     allocator: std.mem.Allocator,
     io: Io,
@@ -425,66 +570,134 @@ fn pingWorkerInProcess(
     try emitWorkerHealthEvent(result, node, nsSince(start, end));
 }
 
+fn shutdownWorkerSession(
+    allocator: std.mem.Allocator,
+    io: Io,
+    stream: *net.Stream,
+) !void {
+    var reader_buffer: [64 * 1024]u8 = undefined;
+    var writer_buffer: [64 * 1024]u8 = undefined;
+    var stream_reader = stream.*.reader(io, &reader_buffer);
+    var stream_writer = stream.*.writer(io, &writer_buffer);
+    try writeFrame(&stream_writer.interface, .shutdown, 0, &.{});
+    var ack = try readFrame(allocator, &stream_reader.interface);
+    defer ack.deinit(allocator);
+    if (ack.header.kind != .ack) return error.InvalidWorkerResponse;
+}
+
 fn runWorkerTraffic(
     allocator: std.mem.Allocator,
     io: Io,
     node: protocol.WorkerNode,
     scenario: Scenario,
-    reader: *Io.Reader,
-    writer: *Io.Writer,
+    stream: *net.Stream,
     result: *RunResult,
 ) !void {
-    var payload: std.ArrayList(u8) = .empty;
-    defer payload.deinit(allocator);
+    for (scenario.message_sizes.items, 0..) |message_size, size_index| {
+        const transfer_count = scenario.transferCountForIndex(size_index);
+        const stats = try measureNetworkMessageSize(
+            allocator,
+            io,
+            node,
+            scenario,
+            stream,
+            message_size,
+            transfer_count,
+            .solo,
+            no_concurrent_links,
+        );
+        try appendMeasuredStats(allocator, result, stats);
+    }
+}
 
-    for (scenario.message_sizes.items) |message_size| {
-        try payload.resize(allocator, message_size);
-        const total_iterations = scenario.warmup_count + scenario.transfer_count;
-        var latencies = try allocator.alloc(u64, scenario.transfer_count);
-        defer allocator.free(latencies);
-        var measured_index: usize = 0;
-        var bytes_sent: u64 = 0;
-        var bytes_received: u64 = 0;
-        var checksum_failures: u64 = 0;
-        const elapsed_start = Io.Clock.awake.now(io).nanoseconds;
+fn measureNetworkMessageSize(
+    allocator: std.mem.Allocator,
+    io: Io,
+    node: protocol.WorkerNode,
+    scenario: Scenario,
+    stream: *net.Stream,
+    message_size: usize,
+    transfer_count: usize,
+    measurement_mode: MeasurementMode,
+    concurrent_links: []const u8,
+) !MessageStats {
+    var reader_buffer: [64 * 1024]u8 = undefined;
+    var writer_buffer: [64 * 1024]u8 = undefined;
+    var stream_reader = stream.*.reader(io, &reader_buffer);
+    var stream_writer = stream.*.writer(io, &writer_buffer);
+    return measureMessageSizeWithFrameIo(
+        allocator,
+        io,
+        node,
+        scenario,
+        message_size,
+        transfer_count,
+        &stream_reader.interface,
+        &stream_writer.interface,
+        measurement_mode,
+        concurrent_links,
+    );
+}
 
-        for (0..total_iterations) |i| {
-            fillPayload(payload.items, scenario.payload_seed, node, message_size, i);
-            const seq = makeSeq(node, message_size, i);
-            const start = Io.Clock.awake.now(io).nanoseconds;
-            try writeFrame(writer, .block, seq, payload.items);
-            var response = try readFrame(allocator, reader);
-            defer response.deinit(allocator);
-            const end = Io.Clock.awake.now(io).nanoseconds;
+fn measureMessageSizeWithFrameIo(
+    allocator: std.mem.Allocator,
+    io: Io,
+    node: protocol.WorkerNode,
+    scenario: Scenario,
+    message_size: usize,
+    transfer_count: usize,
+    reader: *Io.Reader,
+    writer: *Io.Writer,
+    measurement_mode: MeasurementMode,
+    concurrent_links: []const u8,
+) !MessageStats {
+    const payload = try allocator.alloc(u8, message_size);
+    defer allocator.free(payload);
 
-            if (response.header.kind != .echo) return error.InvalidWorkerResponse;
-            if (!verifyFrame(response.header, response.payload) or !std.mem.eql(u8, payload.items, response.payload)) {
-                checksum_failures += 1;
-                result.checksum_failures += 1;
-            }
+    const total_iterations = scenario.warmup_count + transfer_count;
+    var latencies = try allocator.alloc(u64, transfer_count);
+    defer allocator.free(latencies);
+    var measured_index: usize = 0;
+    var bytes_sent: u64 = 0;
+    var bytes_received: u64 = 0;
+    var checksum_failures: u64 = 0;
+    const elapsed_start = Io.Clock.awake.now(io).nanoseconds;
 
-            if (i >= scenario.warmup_count) {
-                latencies[measured_index] = nsSince(start, end);
-                measured_index += 1;
-                bytes_sent += message_size;
-                bytes_received += response.payload.len;
-            }
+    for (0..total_iterations) |i| {
+        fillPayload(payload, scenario.payload_seed, node, message_size, i);
+        const seq = makeSeq(node, message_size, i);
+        const start = Io.Clock.awake.now(io).nanoseconds;
+        try writeFrame(writer, .block, seq, payload);
+        var response = try readFrame(allocator, reader);
+        defer response.deinit(allocator);
+        const end = Io.Clock.awake.now(io).nanoseconds;
+
+        if (response.header.kind != .echo) return error.InvalidWorkerResponse;
+        if (!verifyFrame(response.header, response.payload) or !std.mem.eql(u8, payload, response.payload)) {
+            checksum_failures += 1;
         }
 
-        const elapsed_end = Io.Clock.awake.now(io).nanoseconds;
-        try appendStats(
-            allocator,
-            result,
-            node,
-            message_size,
-            scenario.transfer_count,
-            bytes_sent,
-            bytes_received,
-            checksum_failures,
-            latencies,
-            nsSince(elapsed_start, elapsed_end),
-        );
+        if (i >= scenario.warmup_count) {
+            latencies[measured_index] = nsSince(start, end);
+            measured_index += 1;
+            bytes_sent += message_size;
+            bytes_received += response.payload.len;
+        }
     }
+
+    const elapsed_end = Io.Clock.awake.now(io).nanoseconds;
+    return buildMessageStats(
+        node,
+        message_size,
+        transfer_count,
+        measurement_mode,
+        concurrent_links,
+        bytes_sent,
+        bytes_received,
+        checksum_failures,
+        latencies,
+        nsSince(elapsed_start, elapsed_end),
+    );
 }
 
 fn runInProcessTraffic(
@@ -494,75 +707,99 @@ fn runInProcessTraffic(
     scenario: Scenario,
     result: *RunResult,
 ) !void {
-    var payload: std.ArrayList(u8) = .empty;
-    defer payload.deinit(allocator);
-
-    for (scenario.message_sizes.items) |message_size| {
-        try payload.resize(allocator, message_size);
-        const total_iterations = scenario.warmup_count + scenario.transfer_count;
-        var latencies = try allocator.alloc(u64, scenario.transfer_count);
-        defer allocator.free(latencies);
-        var measured_index: usize = 0;
-        var bytes_sent: u64 = 0;
-        var bytes_received: u64 = 0;
-        var checksum_failures: u64 = 0;
-        const elapsed_start = Io.Clock.awake.now(io).nanoseconds;
-
-        for (0..total_iterations) |i| {
-            fillPayload(payload.items, scenario.payload_seed, node, message_size, i);
-            const seq = makeSeq(node, message_size, i);
-            const start = Io.Clock.awake.now(io).nanoseconds;
-            var response = try roundTripInProcess(allocator, node, .block, seq, payload.items);
-            defer response.deinit(allocator);
-            const end = Io.Clock.awake.now(io).nanoseconds;
-
-            if (response.header.kind != .echo) return error.InvalidWorkerResponse;
-            if (!verifyFrame(response.header, response.payload) or !std.mem.eql(u8, payload.items, response.payload)) {
-                checksum_failures += 1;
-                result.checksum_failures += 1;
-            }
-
-            if (i >= scenario.warmup_count) {
-                latencies[measured_index] = nsSince(start, end);
-                measured_index += 1;
-                bytes_sent += message_size;
-                bytes_received += response.payload.len;
-            }
-        }
-
-        const elapsed_end = Io.Clock.awake.now(io).nanoseconds;
-        try appendStats(
+    for (scenario.message_sizes.items, 0..) |message_size, size_index| {
+        const transfer_count = scenario.transferCountForIndex(size_index);
+        const stats = try measureInProcessMessageSize(
             allocator,
-            result,
+            io,
             node,
+            scenario,
             message_size,
-            scenario.transfer_count,
-            bytes_sent,
-            bytes_received,
-            checksum_failures,
-            latencies,
-            nsSince(elapsed_start, elapsed_end),
+            transfer_count,
+            .solo,
+            no_concurrent_links,
         );
+        try appendMeasuredStats(allocator, result, stats);
     }
 }
 
-fn appendStats(
+fn measureInProcessMessageSize(
     allocator: std.mem.Allocator,
-    result: *RunResult,
+    io: Io,
+    node: protocol.WorkerNode,
+    scenario: Scenario,
+    message_size: usize,
+    transfer_count: usize,
+    measurement_mode: MeasurementMode,
+    concurrent_links: []const u8,
+) !MessageStats {
+    const payload = try allocator.alloc(u8, message_size);
+    defer allocator.free(payload);
+
+    const total_iterations = scenario.warmup_count + transfer_count;
+    var latencies = try allocator.alloc(u64, transfer_count);
+    defer allocator.free(latencies);
+    var measured_index: usize = 0;
+    var bytes_sent: u64 = 0;
+    var bytes_received: u64 = 0;
+    var checksum_failures: u64 = 0;
+    const elapsed_start = Io.Clock.awake.now(io).nanoseconds;
+
+    for (0..total_iterations) |i| {
+        fillPayload(payload, scenario.payload_seed, node, message_size, i);
+        const seq = makeSeq(node, message_size, i);
+        const start = Io.Clock.awake.now(io).nanoseconds;
+        var response = try roundTripInProcess(allocator, node, .block, seq, payload);
+        defer response.deinit(allocator);
+        const end = Io.Clock.awake.now(io).nanoseconds;
+
+        if (response.header.kind != .echo) return error.InvalidWorkerResponse;
+        if (!verifyFrame(response.header, response.payload) or !std.mem.eql(u8, payload, response.payload)) {
+            checksum_failures += 1;
+        }
+
+        if (i >= scenario.warmup_count) {
+            latencies[measured_index] = nsSince(start, end);
+            measured_index += 1;
+            bytes_sent += message_size;
+            bytes_received += response.payload.len;
+        }
+    }
+
+    const elapsed_end = Io.Clock.awake.now(io).nanoseconds;
+    return buildMessageStats(
+        node,
+        message_size,
+        transfer_count,
+        measurement_mode,
+        concurrent_links,
+        bytes_sent,
+        bytes_received,
+        checksum_failures,
+        latencies,
+        nsSince(elapsed_start, elapsed_end),
+    );
+}
+
+fn buildMessageStats(
     node: protocol.WorkerNode,
     message_size: usize,
     transfer_count: usize,
+    measurement_mode: MeasurementMode,
+    concurrent_links: []const u8,
     bytes_sent: u64,
     bytes_received: u64,
     checksum_failures: u64,
     latencies: []u64,
     elapsed_ns: u64,
-) !void {
+) MessageStats {
     std.mem.sortUnstable(u64, latencies, {}, std.sort.asc(u64));
-    const stats = MessageStats{
+    return .{
         .node = node,
         .message_size = message_size,
         .transfer_count = transfer_count,
+        .measurement_mode = measurement_mode,
+        .concurrent_links = concurrent_links,
         .bytes_sent = bytes_sent,
         .bytes_received = bytes_received,
         .checksum_failures = checksum_failures,
@@ -574,12 +811,171 @@ fn appendStats(
         .elapsed_ns = elapsed_ns,
         .throughput_bytes_per_sec = throughput(bytes_sent, elapsed_ns),
     };
+}
+
+fn appendMeasuredStats(
+    allocator: std.mem.Allocator,
+    result: *RunResult,
+    stats: MessageStats,
+) !void {
     try result.stats.append(allocator, stats);
-    result.total_transfers += transfer_count;
-    result.total_bytes_sent += bytes_sent;
-    result.total_bytes_received += bytes_received;
-    result.checksum_failures += checksum_failures;
+    result.total_transfers += stats.transfer_count;
+    result.total_bytes_sent += stats.bytes_sent;
+    result.total_bytes_received += stats.bytes_received;
+    result.checksum_failures += stats.checksum_failures;
     try emitTransferEvent(result, stats);
+}
+
+const ConcurrentTrafficContext = struct {
+    allocator: std.mem.Allocator,
+    io: Io,
+    node: protocol.WorkerNode,
+    scenario: Scenario,
+    stream: ?*net.Stream,
+    start_flag: *std.atomic.Value(bool),
+    message_size: usize,
+    transfer_count: usize,
+    stats: ?MessageStats = null,
+    err: ?anyerror = null,
+};
+
+fn runConcurrentNetworkTraffic(
+    allocator: std.mem.Allocator,
+    io: Io,
+    scenario: Scenario,
+    sessions: []NetworkSession,
+    result: *RunResult,
+) !void {
+    const b_session = findNetworkSession(sessions, .B) orelse return;
+    const c_session = findNetworkSession(sessions, .C) orelse return;
+
+    for (scenario.message_sizes.items, 0..) |message_size, size_index| {
+        const transfer_count = scenario.transferCountForIndex(size_index);
+        var start_flag = std.atomic.Value(bool).init(false);
+        var b_context = ConcurrentTrafficContext{
+            .allocator = allocator,
+            .io = io,
+            .node = .B,
+            .scenario = scenario,
+            .stream = &b_session.stream,
+            .start_flag = &start_flag,
+            .message_size = message_size,
+            .transfer_count = transfer_count,
+        };
+        var c_context = ConcurrentTrafficContext{
+            .allocator = allocator,
+            .io = io,
+            .node = .C,
+            .scenario = scenario,
+            .stream = &c_session.stream,
+            .start_flag = &start_flag,
+            .message_size = message_size,
+            .transfer_count = transfer_count,
+        };
+
+        try runConcurrentPairContexts(&start_flag, &b_context, &c_context);
+        try appendMeasuredStats(allocator, result, b_context.stats.?);
+        try appendMeasuredStats(allocator, result, c_context.stats.?);
+    }
+}
+
+fn runConcurrentInProcessTraffic(
+    allocator: std.mem.Allocator,
+    io: Io,
+    scenario: Scenario,
+    result: *RunResult,
+) !void {
+    for (scenario.message_sizes.items, 0..) |message_size, size_index| {
+        const transfer_count = scenario.transferCountForIndex(size_index);
+        var start_flag = std.atomic.Value(bool).init(false);
+        var b_context = ConcurrentTrafficContext{
+            .allocator = allocator,
+            .io = io,
+            .node = .B,
+            .scenario = scenario,
+            .stream = null,
+            .start_flag = &start_flag,
+            .message_size = message_size,
+            .transfer_count = transfer_count,
+        };
+        var c_context = ConcurrentTrafficContext{
+            .allocator = allocator,
+            .io = io,
+            .node = .C,
+            .scenario = scenario,
+            .stream = null,
+            .start_flag = &start_flag,
+            .message_size = message_size,
+            .transfer_count = transfer_count,
+        };
+
+        try runConcurrentPairContexts(&start_flag, &b_context, &c_context);
+        try appendMeasuredStats(allocator, result, b_context.stats.?);
+        try appendMeasuredStats(allocator, result, c_context.stats.?);
+    }
+}
+
+fn runConcurrentPairContexts(
+    start_flag: *std.atomic.Value(bool),
+    left: *ConcurrentTrafficContext,
+    right: *ConcurrentTrafficContext,
+) !void {
+    const left_thread = try std.Thread.spawn(.{}, concurrentTrafficThread, .{left});
+    const right_thread = std.Thread.spawn(.{}, concurrentTrafficThread, .{right}) catch |err| {
+        start_flag.store(true, .release);
+        left_thread.join();
+        return err;
+    };
+
+    start_flag.store(true, .release);
+    left_thread.join();
+    right_thread.join();
+
+    if (left.err) |err| return err;
+    if (right.err) |err| return err;
+    if (left.stats == null or right.stats == null) return error.ConcurrentMeasurementFailed;
+}
+
+fn concurrentTrafficThread(context: *ConcurrentTrafficContext) void {
+    while (!context.start_flag.load(.acquire)) {
+        std.Thread.yield() catch {};
+    }
+
+    const stats = if (context.stream) |stream|
+        measureNetworkMessageSize(
+            context.allocator,
+            context.io,
+            context.node,
+            context.scenario,
+            stream,
+            context.message_size,
+            context.transfer_count,
+            .concurrent,
+            ab_ac_concurrent_links,
+        )
+    else
+        measureInProcessMessageSize(
+            context.allocator,
+            context.io,
+            context.node,
+            context.scenario,
+            context.message_size,
+            context.transfer_count,
+            .concurrent,
+            ab_ac_concurrent_links,
+        );
+
+    context.stats = stats catch |err| {
+        context.err = err;
+        return;
+    };
+}
+
+fn findNetworkSession(sessions: []NetworkSession, node: protocol.WorkerNode) ?*NetworkSession {
+    for (sessions) |*session| {
+        if (session.endpoint.node == node) return session;
+    }
+    return null;
 }
 
 fn handleWorkerSession(
@@ -843,7 +1239,7 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     for (result.stats.items, 0..) |stats, i| {
         if (i != 0) try writer.writeAll(",\n");
         try writer.print(
-            "      {{\"node_pair\":\"A-{s}\",\"message_size_bytes\":{d},\"sample_count\":{d},\"checksum_failures\":{d},\"p50_us\":{d},\"p95_us\":{d},\"p99_us\":{d}}}",
+            "      {{\"node_pair\":\"A-{s}\",\"message_size_bytes\":{d},\"sample_count\":{d},\"checksum_failures\":{d},\"p50_us\":{d},\"p95_us\":{d},\"p99_us\":{d},\"measurement_mode\":\"{s}\",\"concurrent_links\":\"{s}\"}}",
             .{
                 protocol.WorkerNode.label(stats.node),
                 stats.message_size,
@@ -852,6 +1248,8 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToUs(stats.p50_latency_ns),
                 nsToUs(stats.p95_latency_ns),
                 nsToUs(stats.p99_latency_ns),
+                MeasurementMode.label(stats.measurement_mode),
+                stats.concurrent_links,
             },
         );
     }
@@ -860,7 +1258,7 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     for (result.stats.items, 0..) |stats, i| {
         if (i != 0) try writer.writeAll(",\n");
         try writer.print(
-            "      {{\"node_pair\":\"A-{s}\",\"block_size_bytes\":{d},\"transfer_count\":{d},\"bytes_sent\":{d},\"checksum_failures\":{d},\"duration_ms\":{d},\"mib_per_sec\":{d},\"gbps\":{d}}}",
+            "      {{\"node_pair\":\"A-{s}\",\"block_size_bytes\":{d},\"transfer_count\":{d},\"bytes_sent\":{d},\"checksum_failures\":{d},\"duration_ms\":{d},\"mib_per_sec\":{d},\"gbps\":{d},\"measurement_mode\":\"{s}\",\"concurrent_links\":\"{s}\"}}",
             .{
                 protocol.WorkerNode.label(stats.node),
                 stats.message_size,
@@ -870,6 +1268,8 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToMs(stats.elapsed_ns),
                 bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
                 bytesPerSecToGbps(stats.throughput_bytes_per_sec),
+                MeasurementMode.label(stats.measurement_mode),
+                stats.concurrent_links,
             },
         );
     }
@@ -890,7 +1290,7 @@ fn writeLatencyCsv(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("schema_version,run_id,node_pair,direction,message_size_bytes,sample_count,warmup_count,transfer_count,checksum_algorithm,checksum_failures,p50_us,p95_us,p99_us,min_us,max_us,jitter_us,remote_expert_rate,scenario_step\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},{d},sha256,{d},{d},{d},{d},{d},{d},{d},0.0,{s}-block-{d}\n",
+            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},{d},sha256,{d},{d},{d},{d},{d},{d},{d},0.0,{s}-block-{d}-{s}\n",
             .{
                 result.run_id,
                 protocol.WorkerNode.label(stats.node),
@@ -907,6 +1307,7 @@ fn writeLatencyCsv(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToUs(stats.p99_latency_ns) -| nsToUs(stats.p50_latency_ns),
                 result.scenario_kind,
                 stats.message_size,
+                MeasurementMode.label(stats.measurement_mode),
             },
         );
     }
@@ -916,7 +1317,7 @@ fn writeThroughputCsv(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("schema_version,run_id,node_pair,direction,block_size_bytes,transfer_count,bytes_sent,checksum_algorithm,checksum_failures,duration_ms,mib_per_sec,gbps,concurrent_links,remote_expert_rate,scenario_step\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},none,0.0,{s}-block-{d}\n",
+            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},{s},0.0,{s}-block-{d}-{s}\n",
             .{
                 result.run_id,
                 protocol.WorkerNode.label(stats.node),
@@ -927,8 +1328,10 @@ fn writeThroughputCsv(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToMs(stats.elapsed_ns),
                 bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
                 bytesPerSecToGbps(stats.throughput_bytes_per_sec),
+                stats.concurrent_links,
                 result.scenario_kind,
                 stats.message_size,
+                MeasurementMode.label(stats.measurement_mode),
             },
         );
     }
@@ -982,20 +1385,27 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
     }
 
     try writer.writeAll("\n## Throughput\n\n");
-    try writer.writeAll("| Node pair | Block bytes | Transfers | Throughput MiB/s | Gbps |\n");
-    try writer.writeAll("|---|---:|---:|---:|---:|\n");
+    try writer.writeAll("| Node pair | Block bytes | Mode | Concurrent links | Transfers | Throughput MiB/s | Gbps |\n");
+    try writer.writeAll("|---|---:|---|---|---:|---:|---:|\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "| A-{s} | {d} | {d} | {d} | {d} |\n",
+            "| A-{s} | {d} | {s} | {s} | {d} | {d} | {d} |\n",
             .{
                 protocol.WorkerNode.label(stats.node),
                 stats.message_size,
+                MeasurementMode.label(stats.measurement_mode),
+                stats.concurrent_links,
                 stats.transfer_count,
                 bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
                 bytesPerSecToGbps(stats.throughput_bytes_per_sec),
             },
         );
     }
+
+    try writer.writeAll("\n## Concurrent Link Interference\n\n");
+    try writer.writeAll("| Node pair | Solo MiB/s | Concurrent MiB/s | Degradation pct |\n");
+    try writer.writeAll("|---|---:|---:|---:|\n");
+    try writeConcurrentInterferenceMarkdown(writer, result);
 
     try writer.writeAll("\n## Reliability\n\n");
     try writer.print("- checksum failures: {d}\n", .{result.checksum_failures});
@@ -1088,19 +1498,21 @@ fn emitTransferEvent(result: *RunResult, stats: MessageStats) !void {
     const writer = &result.events.writer;
     try writeEventPrefix(result, "latency_sample", "info");
     try writer.print(
-        ",\"node_pair\":\"A-{s}\",\"message_size_bytes\":{d},\"latency_us\":{d},\"checksum_status\":\"{s}\",\"remote_expert_rate\":0.0,\"details\":{{\"sample_count\":{d}}}}}\n",
+        ",\"node_pair\":\"A-{s}\",\"message_size_bytes\":{d},\"latency_us\":{d},\"checksum_status\":\"{s}\",\"remote_expert_rate\":0.0,\"details\":{{\"sample_count\":{d},\"measurement_mode\":\"{s}\",\"concurrent_links\":\"{s}\"}}}}\n",
         .{
             protocol.WorkerNode.label(stats.node),
             stats.message_size,
             nsToUs(stats.p50_latency_ns),
             if (stats.checksum_failures == 0) "pass" else "fail",
             stats.transfer_count,
+            MeasurementMode.label(stats.measurement_mode),
+            stats.concurrent_links,
         },
     );
 
     try writeEventPrefix(result, "throughput_sample", "info");
     try writer.print(
-        ",\"node_pair\":\"A-{s}\",\"block_size_bytes\":{d},\"bytes_sent\":{d},\"throughput_mib_s\":{d},\"checksum_status\":\"{s}\",\"remote_expert_rate\":0.0,\"details\":{{\"transfer_count\":{d}}}}}\n",
+        ",\"node_pair\":\"A-{s}\",\"block_size_bytes\":{d},\"bytes_sent\":{d},\"throughput_mib_s\":{d},\"checksum_status\":\"{s}\",\"remote_expert_rate\":0.0,\"details\":{{\"transfer_count\":{d},\"measurement_mode\":\"{s}\",\"concurrent_links\":\"{s}\"}}}}\n",
         .{
             protocol.WorkerNode.label(stats.node),
             stats.message_size,
@@ -1108,6 +1520,8 @@ fn emitTransferEvent(result: *RunResult, stats: MessageStats) !void {
             bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
             if (stats.checksum_failures == 0) "pass" else "fail",
             stats.transfer_count,
+            MeasurementMode.label(stats.measurement_mode),
+            stats.concurrent_links,
         },
     );
 
@@ -1169,15 +1583,19 @@ fn writeMessageSizesJson(writer: *Io.Writer, result: *const RunResult) !void {
 
 fn writeConcurrentInterference(writer: *Io.Writer, result: *const RunResult) !void {
     var wrote_any = false;
-    for (result.stats.items) |stats| {
-        if (stats.message_size != largestMessageSize(result)) continue;
+    const block_size = largestMessageSize(result);
+    const nodes = [_]protocol.WorkerNode{ .B, .C };
+    for (nodes) |node| {
+        const solo = findMessageStats(result, node, block_size, .solo) orelse continue;
+        const concurrent = findMessageStats(result, node, block_size, .concurrent) orelse continue;
         if (wrote_any) try writer.writeByte(',');
         try writer.print(
-            "{{\"node_pair\":\"A-{s}\",\"solo_mib_per_sec\":{d},\"concurrent_mib_per_sec\":{d},\"degradation_pct\":0}}",
+            "{{\"node_pair\":\"A-{s}\",\"solo_mib_per_sec\":{d},\"concurrent_mib_per_sec\":{d},\"degradation_pct\":{d}}}",
             .{
-                protocol.WorkerNode.label(stats.node),
-                bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
-                bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
+                protocol.WorkerNode.label(node),
+                bytesPerSecToMibPerSec(solo.throughput_bytes_per_sec),
+                bytesPerSecToMibPerSec(concurrent.throughput_bytes_per_sec),
+                degradationPct(solo.throughput_bytes_per_sec, concurrent.throughput_bytes_per_sec),
             },
         );
         wrote_any = true;
@@ -1185,6 +1603,53 @@ fn writeConcurrentInterference(writer: *Io.Writer, result: *const RunResult) !vo
     if (!wrote_any) {
         try writer.writeAll("{\"node_pair\":\"A-B\",\"solo_mib_per_sec\":0,\"concurrent_mib_per_sec\":0,\"degradation_pct\":0}");
     }
+}
+
+fn writeConcurrentInterferenceMarkdown(writer: *Io.Writer, result: *const RunResult) !void {
+    var wrote_any = false;
+    const block_size = largestMessageSize(result);
+    const nodes = [_]protocol.WorkerNode{ .B, .C };
+    for (nodes) |node| {
+        const solo = findMessageStats(result, node, block_size, .solo) orelse continue;
+        const concurrent = findMessageStats(result, node, block_size, .concurrent) orelse continue;
+        try writer.print(
+            "| A-{s} | {d} | {d} | {d} |\n",
+            .{
+                protocol.WorkerNode.label(node),
+                bytesPerSecToMibPerSec(solo.throughput_bytes_per_sec),
+                bytesPerSecToMibPerSec(concurrent.throughput_bytes_per_sec),
+                degradationPct(solo.throughput_bytes_per_sec, concurrent.throughput_bytes_per_sec),
+            },
+        );
+        wrote_any = true;
+    }
+    if (!wrote_any) {
+        try writer.writeAll("| A-B | 0 | 0 | 0 |\n");
+    }
+}
+
+fn findMessageStats(
+    result: *const RunResult,
+    node: protocol.WorkerNode,
+    message_size: usize,
+    measurement_mode: MeasurementMode,
+) ?MessageStats {
+    for (result.stats.items) |stats| {
+        if (stats.node == node and
+            stats.message_size == message_size and
+            stats.measurement_mode == measurement_mode)
+        {
+            return stats;
+        }
+    }
+    return null;
+}
+
+fn degradationPct(solo_bytes_per_sec: u64, concurrent_bytes_per_sec: u64) i64 {
+    if (solo_bytes_per_sec == 0) return 0;
+    const solo: i128 = @intCast(solo_bytes_per_sec);
+    const concurrent: i128 = @intCast(concurrent_bytes_per_sec);
+    return @intCast(@divTrunc((solo - concurrent) * 100, solo));
 }
 
 fn maxTransferCount(result: *const RunResult) usize {
@@ -1250,8 +1715,13 @@ pub fn parseScenario(allocator: std.mem.Allocator, text: []const u8) !Scenario {
     var scenario = Scenario{
         .name = "unknown",
         .message_sizes = .empty,
+        .transfer_counts_by_message_size = .empty,
         .transfer_count = 0,
         .warmup_count = 0,
+        .concurrency = 1,
+        .concurrency_modes = .empty,
+        .run_pairs_concurrently = false,
+        .worker_pairs = .empty,
         .payload_seed = 0,
     };
     errdefer scenario.deinit(allocator);
@@ -1264,17 +1734,36 @@ pub fn parseScenario(allocator: std.mem.Allocator, text: []const u8) !Scenario {
             scenario.name = value;
         } else if (arrayValue(line, "message_sizes_bytes")) |value| {
             try parseSizeArray(allocator, value, &scenario.message_sizes);
+        } else if (arrayValue(line, "transfer_counts_by_message_size")) |value| {
+            try parseSizeArray(allocator, value, &scenario.transfer_counts_by_message_size);
         } else if (intValue(usize, line, "transfer_count_per_message_size")) |value| {
             scenario.transfer_count = value;
         } else if (intValue(usize, line, "warmup_count_per_message_size")) |value| {
             scenario.warmup_count = value;
+        } else if (intValue(usize, line, "concurrency")) |value| {
+            scenario.concurrency = value;
+        } else if (arrayValue(line, "concurrency_modes")) |value| {
+            try parseConcurrencyModeArray(allocator, value, &scenario.concurrency_modes);
+        } else if (boolValue(line, "run_pairs_concurrently")) |value| {
+            scenario.run_pairs_concurrently = value;
+        } else if (arrayValue(line, "worker_pairs")) |value| {
+            try parseWorkerPairArray(allocator, value, &scenario.worker_pairs);
         } else if (intValue(u64, line, "payload_seed")) |value| {
             scenario.payload_seed = value;
         }
     }
 
     if (scenario.message_sizes.items.len == 0) return error.MissingMessageSizes;
-    if (scenario.transfer_count == 0) return error.MissingTransferCount;
+    if (scenario.transfer_counts_by_message_size.items.len != 0 and
+        scenario.transfer_counts_by_message_size.items.len != scenario.message_sizes.items.len)
+    {
+        return error.TransferCountLengthMismatch;
+    }
+    if (scenario.transfer_counts_by_message_size.items.len == 0 and scenario.transfer_count == 0) return error.MissingTransferCount;
+    for (scenario.transfer_counts_by_message_size.items) |count| {
+        if (count == 0) return error.MissingTransferCount;
+    }
+    if (scenario.concurrency == 0) return error.InvalidConcurrency;
     return scenario;
 }
 
@@ -1356,6 +1845,39 @@ fn parseSizeArray(
         if (item.len == 0) continue;
         try sizes.append(allocator, try std.fmt.parseInt(usize, item, 10));
     }
+}
+
+fn parseConcurrencyModeArray(
+    allocator: std.mem.Allocator,
+    value: []const u8,
+    modes: *std.ArrayList(ConcurrencyMode),
+) !void {
+    var items = std.mem.splitScalar(u8, value, ',');
+    while (items.next()) |raw_item| {
+        const item = parseQuotedArrayItem(raw_item) orelse return error.InvalidConcurrencyMode;
+        const mode = ConcurrencyMode.parse(item) orelse return error.InvalidConcurrencyMode;
+        try modes.append(allocator, mode);
+    }
+}
+
+fn parseWorkerPairArray(
+    allocator: std.mem.Allocator,
+    value: []const u8,
+    pairs: *std.ArrayList(WorkerPair),
+) !void {
+    var items = std.mem.splitScalar(u8, value, ',');
+    while (items.next()) |raw_item| {
+        const item = parseQuotedArrayItem(raw_item) orelse return error.InvalidWorkerPair;
+        const pair = WorkerPair.parse(item) orelse return error.InvalidWorkerPair;
+        try pairs.append(allocator, pair);
+    }
+}
+
+fn parseQuotedArrayItem(raw_item: []const u8) ?[]const u8 {
+    const item = std.mem.trim(u8, raw_item, " \t\r\n");
+    if (item.len == 0) return null;
+    if (item.len < 2 or item[0] != '"' or item[item.len - 1] != '"') return null;
+    return item[1 .. item.len - 1];
 }
 
 fn quotedValue(line: []const u8, key: []const u8) ?[]const u8 {
@@ -1501,6 +2023,8 @@ test "cluster parser classifies socket-localhost as non-hardware" {
     try std.testing.expectEqual(@as(usize, 2), cluster.worker_count);
     try std.testing.expectEqual(RunMode.socket_localhost, classifyRunMode(cluster));
     try std.testing.expect(!hardwareInterpretable(cluster, classifyRunMode(cluster)));
+    try std.testing.expect(isLocalEndpoint("127.0.0.1"));
+    try std.testing.expect(isLocalEndpoint("localhost"));
 }
 
 test "scenario parser reads loopback traffic shape" {
@@ -1522,4 +2046,33 @@ test "scenario parser reads loopback traffic shape" {
     try std.testing.expectEqual(@as(usize, 5), scenario.transfer_count);
     try std.testing.expectEqual(@as(usize, 1), scenario.warmup_count);
     try std.testing.expectEqual(@as(u64, 1337), scenario.payload_seed);
+}
+
+test "scenario parser reads per-size counts and concurrent A-B/A-C request" {
+    const text =
+        \\scenario_name = "concurrent_transport_sweep"
+        \\[traffic]
+        \\message_sizes_bytes = [64, 1024, 4096]
+        \\transfer_counts_by_message_size = [9, 7, 5]
+        \\warmup_count_per_message_size = 2
+        \\concurrency = 2
+        \\concurrency_modes = ["A-B", "A-C", "A-B-and-A-C"]
+        \\worker_pairs = ["A-B", "A-C"]
+        \\run_pairs_concurrently = true
+        \\payload_seed = 42
+        \\
+    ;
+    var scenario = try parseScenario(std.testing.allocator, text);
+    defer scenario.deinit(std.testing.allocator);
+
+    try std.testing.expectEqualStrings("concurrent_transport_sweep", scenario.name);
+    try std.testing.expectEqual(@as(usize, 3), scenario.message_sizes.items.len);
+    try std.testing.expectEqual(@as(usize, 9), scenario.transferCountForIndex(0));
+    try std.testing.expectEqual(@as(usize, 7), scenario.transferCountForIndex(1));
+    try std.testing.expectEqual(@as(usize, 5), scenario.transferCountForIndex(2));
+    try std.testing.expectEqual(@as(usize, 2), scenario.concurrency);
+    try std.testing.expect(scenario.hasConcurrencyMode(.a_b_and_a_c));
+    try std.testing.expect(scenario.hasWorkerPair(.a_b));
+    try std.testing.expect(scenario.hasWorkerPair(.a_c));
+    try std.testing.expect(scenario.requestsConcurrentABAC());
 }
