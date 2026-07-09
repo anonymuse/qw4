@@ -1,0 +1,54 @@
+# DS5 Phase 0 loopback transport smoke.
+# Use this to verify protocol, checksums, timing capture, and artifact writing.
+
+schema_version = 1
+scenario_name = "loopback_transport_smoke"
+scenario_kind = "transport_smoke"
+description = "Small deterministic loopback run for coordinator/worker transport plumbing."
+
+[node_roles]
+coordinator = "A"
+workers = ["B", "C"]
+required_nodes = ["A", "B", "C"]
+
+[interpretation]
+traffic_model = "synthetic_fixed_blocks"
+transport_scope = "loopback"
+synthetic = true
+loopback = true
+real_cluster = false
+may_interpret_as_real_hardware_data = false
+may_interpret_as_model_inference_data = false
+notes = [
+  "Validates local protocol behavior and artifact shape.",
+  "Must not be used for Thunderbolt, inter-node, or model-throughput claims."
+]
+
+[artifacts]
+default_dir = "artifacts/runs/loopback-smoke"
+cli_out_may_override = true
+required_files = ["run.json", "events.jsonl", "latency.csv", "throughput.csv", "summary.md"]
+
+[traffic]
+message_sizes_bytes = [64, 1024, 4096, 65536, 1048576]
+transfer_count_per_message_size = 100
+warmup_count_per_message_size = 10
+concurrency = 1
+direction = "coordinator_to_each_worker_then_echo"
+worker_pairs = ["A-B", "A-C"]
+run_pairs_concurrently = false
+payload_seed = 1337
+checksum_mode = "sha256"
+checksum_scope = "full_payload_each_transfer"
+
+[health]
+heartbeat_required = true
+reconnect_expected = false
+fail_run_on_checksum_error = true
+fail_run_on_worker_timeout = true
+
+[validity]
+requires_loopback_cluster_config = true
+requires_confirmed_non_loopback_cluster = false
+invalid_if_network_path_not_loopback = true
+valid_result_summary = "Protocol and artifact smoke only."

@@ -1,0 +1,560 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ds5.local/benchmarks/schemas/run.schema.json",
+  "title": "DS5 Phase 0 run.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "git_commit",
+    "software",
+    "started_at",
+    "ended_at",
+    "duration_ms",
+    "valid",
+    "environment",
+    "scenario",
+    "nodes",
+    "checksums",
+    "failure_counts",
+    "metrics",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "phase0.artifacts.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "started_at": {
+      "$ref": "#/$defs/rfc3339_utc"
+    },
+    "ended_at": {
+      "$ref": "#/$defs/rfc3339_utc"
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "network_path",
+        "clock_sync",
+        "hardware_interpretable"
+      ],
+      "properties": {
+        "network_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clock_sync": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hardware_interpretable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "config_path",
+        "kind",
+        "message_sizes_bytes",
+        "block_sizes_bytes",
+        "transfer_count",
+        "warmup_count",
+        "checksum_mode",
+        "remote_expert_rates",
+        "qwen_shape"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "synthetic",
+            "loopback",
+            "real_cluster"
+          ]
+        },
+        "message_sizes_bytes": {
+          "$ref": "#/$defs/positive_integer_array"
+        },
+        "block_sizes_bytes": {
+          "$ref": "#/$defs/positive_integer_array"
+        },
+        "transfer_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "warmup_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checksum_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remote_expert_rates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "qwen_shape": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layers",
+            "hidden_size",
+            "top_k",
+            "packets_per_destination_per_layer",
+            "layer_owners"
+          ],
+          "properties": {
+            "layers": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "hidden_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "top_k": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "packets_per_destination_per_layer": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "layer_owners": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "node_id",
+                  "start_layer",
+                  "end_layer"
+                ],
+                "properties": {
+                  "node_id": {
+                    "$ref": "#/$defs/node_id"
+                  },
+                  "start_layer": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end_layer": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "role",
+          "hostname",
+          "hardware_label",
+          "transport"
+        ],
+        "properties": {
+          "node_id": {
+            "$ref": "#/$defs/node_id"
+          },
+          "role": {
+            "enum": [
+              "coordinator",
+              "worker"
+            ]
+          },
+          "hostname": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hardware_label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "listen_addr": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "total_transfers",
+        "passed",
+        "failed",
+        "status"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_transfers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        }
+      }
+    },
+    "failure_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failures",
+        "retries",
+        "reconnects",
+        "timeouts"
+      ],
+      "properties": {
+        "failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reconnects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeouts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latency_by_message_size",
+        "throughput_by_block_size",
+        "scheduler_overhead_us_per_token",
+        "bytes_sent_per_simulated_token",
+        "per_layer_transport_time_us",
+        "concurrent_link_interference",
+        "predicted_upper_bound_tokens_per_sec"
+      ],
+      "properties": {
+        "latency_by_message_size": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/latency_metric"
+          }
+        },
+        "throughput_by_block_size": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/throughput_metric"
+          }
+        },
+        "scheduler_overhead_us_per_token": {
+          "$ref": "#/$defs/percentiles"
+        },
+        "bytes_sent_per_simulated_token": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "per_layer_transport_time_us": {
+          "$ref": "#/$defs/percentiles"
+        },
+        "concurrent_link_interference": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node_pair",
+              "solo_mib_per_sec",
+              "concurrent_mib_per_sec",
+              "degradation_pct"
+            ],
+            "properties": {
+              "node_pair": {
+                "$ref": "#/$defs/node_pair"
+              },
+              "solo_mib_per_sec": {
+                "type": "number",
+                "minimum": 0
+              },
+              "concurrent_mib_per_sec": {
+                "type": "number",
+                "minimum": 0
+              },
+              "degradation_pct": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "predicted_upper_bound_tokens_per_sec": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "remote_expert_rate",
+              "tokens_per_sec"
+            ],
+            "properties": {
+              "remote_expert_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "tokens_per_sec": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events",
+        "latency",
+        "throughput",
+        "summary"
+      ],
+      "properties": {
+        "events": {
+          "const": "events.jsonl"
+        },
+        "latency": {
+          "const": "latency.csv"
+        },
+        "throughput": {
+          "const": "throughput.csv"
+        },
+        "summary": {
+          "const": "summary.md"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rfc3339_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "node_id": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]*$"
+    },
+    "node_pair": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]*-[A-Z][A-Z0-9_-]*$"
+    },
+    "positive_integer_array": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "percentiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "properties": {
+        "p50": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p99": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "latency_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_pair",
+        "message_size_bytes",
+        "sample_count",
+        "checksum_failures",
+        "p50_us",
+        "p95_us",
+        "p99_us"
+      ],
+      "properties": {
+        "node_pair": {
+          "$ref": "#/$defs/node_pair"
+        },
+        "message_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "checksum_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50_us": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_us": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p99_us": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "throughput_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_pair",
+        "block_size_bytes",
+        "transfer_count",
+        "bytes_sent",
+        "checksum_failures",
+        "duration_ms",
+        "mib_per_sec",
+        "gbps"
+      ],
+      "properties": {
+        "node_pair": {
+          "$ref": "#/$defs/node_pair"
+        },
+        "block_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "transfer_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bytes_sent": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "checksum_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mib_per_sec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "gbps": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

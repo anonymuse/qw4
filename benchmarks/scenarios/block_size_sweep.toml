@@ -1,0 +1,55 @@
+# DS5 Phase 0 block-size sweep.
+# Measures synthetic payload movement over the configured transport.
+
+schema_version = 1
+scenario_name = "block_size_sweep"
+scenario_kind = "block_size_sweep"
+description = "Deterministic sweep from small messages to large transport/storage-sized blocks."
+
+[node_roles]
+coordinator = "A"
+workers = ["B", "C"]
+required_nodes = ["A", "B", "C"]
+
+[interpretation]
+traffic_model = "synthetic_fixed_blocks"
+transport_scope = "real_cluster"
+synthetic = true
+loopback = false
+real_cluster = true
+may_interpret_as_real_hardware_data = true
+may_interpret_as_model_inference_data = false
+notes = [
+  "Use with a real cluster config for hardware transport curves.",
+  "Payloads are deterministic blocks, not model activations or weight tensors."
+]
+
+[artifacts]
+default_dir = "artifacts/runs/block-size-sweep"
+cli_out_may_override = true
+required_files = ["run.json", "events.jsonl", "latency.csv", "throughput.csv", "summary.md"]
+
+[traffic]
+message_sizes_bytes = [4096, 16384, 65536, 262144, 1048576, 4194304, 16777216, 67108864, 134217728, 268435456]
+transfer_counts_by_message_size = [4096, 2048, 1024, 512, 128, 32, 8, 4, 2, 1]
+transfer_count_semantics = "index-aligned with message_sizes_bytes"
+warmup_count_per_message_size = 3
+concurrency_modes = ["A-B", "A-C", "A-B-and-A-C"]
+direction = "coordinator_to_worker_then_ack"
+worker_pairs = ["A-B", "A-C"]
+payload_seed = 424242
+checksum_mode = "sha256"
+checksum_scope = "full_payload_each_transfer"
+
+[health]
+heartbeat_required = true
+reconnect_expected = false
+fail_run_on_checksum_error = true
+fail_run_on_worker_timeout = true
+
+[validity]
+requires_loopback_cluster_config = false
+requires_confirmed_non_loopback_cluster = true
+requires_recorded_network_path = true
+invalid_if_wifi_fallback_detected = true
+valid_result_summary = "Real transport data only when run on confirmed non-loopback cluster; not model inference throughput."

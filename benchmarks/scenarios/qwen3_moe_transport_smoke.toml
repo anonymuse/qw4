@@ -1,0 +1,83 @@
+# DS5 Phase 0 Qwen3-shaped MoE transport smoke.
+# This is synthetic traffic shaped like the first DS5 target. It does not load model weights.
+
+schema_version = 1
+scenario_name = "qwen3_moe_transport_smoke"
+scenario_kind = "qwen3_moe_transport_smoke"
+description = "Synthetic Qwen3 MoE activation/result movement across coordinator A and workers B/C."
+
+[node_roles]
+coordinator = "A"
+workers = ["B", "C"]
+required_nodes = ["A", "B", "C"]
+
+[interpretation]
+traffic_model = "synthetic_qwen3_moe_activation_result"
+transport_scope = "real_cluster"
+synthetic = true
+loopback = false
+real_cluster = true
+may_interpret_as_real_hardware_data = true
+may_interpret_as_model_inference_data = false
+notes = [
+  "Real-hardware interpretation requires a non-loopback cluster config with recorded network path.",
+  "The traffic is Qwen3-shaped but contains deterministic synthetic payloads, not real activations."
+]
+
+[artifacts]
+default_dir = "artifacts/runs/qwen3-moe-transport-smoke"
+cli_out_may_override = true
+required_files = ["run.json", "events.jsonl", "latency.csv", "throughput.csv", "summary.md"]
+
+[traffic]
+message_sizes_bytes = [8192, 16384, 32768, 65536]
+transfer_count_per_message_size = 64
+warmup_count_per_message_size = 8
+concurrency = 2
+direction = "coordinator_to_destination_workers_then_result_return"
+worker_pairs = ["A-B", "A-C"]
+run_pairs_concurrently = true
+payload_seed = 20260709
+checksum_mode = "sha256"
+checksum_scope = "full_payload_each_transfer"
+
+[qwen3_moe]
+model_target = "Qwen3-235B-A22B-Instruct-2507"
+layers = 94
+hidden_size = 4096
+top_k = 8
+activation_dtype = "fp16"
+activation_bytes_per_token = 8192
+simulated_tokens = 64
+destination_nodes = ["B", "C"]
+activation_packets_per_destination_per_layer = 1
+result_packets_per_destination_per_layer = 1
+packetization = "one activation packet and one result packet per destination node per layer"
+local_expert_rate_sweep = [1.0, 0.875, 0.75, 0.5, 0.25, 0.0]
+remote_expert_rate_sweep = [0.0, 0.125, 0.25, 0.5, 0.75, 1.0]
+expert_rate_sweep_semantics = "index-aligned; local_expert_rate_sweep[i] + remote_expert_rate_sweep[i] must equal 1.0"
+
+[[qwen3_moe.layer_ownership]]
+node = "B"
+start_layer = 0
+end_layer = 46
+inclusive = true
+
+[[qwen3_moe.layer_ownership]]
+node = "C"
+start_layer = 47
+end_layer = 93
+inclusive = true
+
+[health]
+heartbeat_required = true
+reconnect_expected = false
+fail_run_on_checksum_error = true
+fail_run_on_worker_timeout = true
+
+[validity]
+requires_loopback_cluster_config = false
+requires_confirmed_non_loopback_cluster = true
+requires_recorded_network_path = true
+invalid_if_wifi_fallback_detected = true
+valid_result_summary = "Real transport data with synthetic Qwen3-shaped payloads; not model inference throughput."

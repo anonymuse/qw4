@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ds5.local/benchmarks/schemas/event.schema.json",
+  "title": "DS5 Phase 0 events.jsonl record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "sequence",
+    "timestamp",
+    "event_type",
+    "severity",
+    "details"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "phase0.artifacts.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "event_type": {
+      "enum": [
+        "run_started",
+        "node_discovered",
+        "worker_health",
+        "latency_sample",
+        "throughput_sample",
+        "checksum_verified",
+        "retry_scheduled",
+        "reconnect_succeeded",
+        "failure_observed",
+        "simulated_layer_transfer",
+        "run_completed"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ]
+    },
+    "node_id": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]*$"
+    },
+    "hostname": {
+      "type": "string",
+      "minLength": 1
+    },
+    "node_pair": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]*-[A-Z][A-Z0-9_-]*$"
+    },
+    "message_size_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "block_size_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "bytes_sent": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latency_us": {
+      "type": "number",
+      "minimum": 0
+    },
+    "throughput_mib_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "transfer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checksum_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "not_applicable"
+      ]
+    },
+    "health_status": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "unreachable"
+      ]
+    },
+    "failure_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "layer_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "remote_expert_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "details": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "node_discovered"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "node_id",
+          "hostname",
+          "latency_us"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "worker_health"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "node_id",
+          "health_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "latency_sample"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "node_pair",
+          "message_size_bytes",
+          "latency_us",
+          "checksum_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "throughput_sample"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "node_pair",
+          "block_size_bytes",
+          "bytes_sent",
+          "throughput_mib_s",
+          "checksum_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "checksum_verified"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "transfer_id",
+          "checksum_status",
+          "bytes_sent"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "retry_scheduled"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "failure_kind",
+          "retry_count"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "reconnect_succeeded"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "node_id",
+          "retry_count",
+          "latency_us"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "failure_observed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "failure_kind"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "simulated_layer_transfer"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "layer_index",
+          "node_pair",
+          "bytes_sent",
+          "latency_us"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "run_completed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "valid"
+        ]
+      }
+    }
+  ]
+}

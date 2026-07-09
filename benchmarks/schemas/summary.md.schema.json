@@ -1,0 +1,35 @@
+{
+  "$schema": "https://ds5.local/benchmarks/schemas/markdown-minimum-v1",
+  "schema_version": "phase0.artifacts.v1",
+  "artifact": "summary.md",
+  "required_headings": [
+    "#",
+    "## Run",
+    "## Scenario",
+    "## Nodes",
+    "## Latency",
+    "## Throughput",
+    "## Reliability",
+    "## Interpretation"
+  ],
+  "required_facts": [
+    "run_id",
+    "git_commit",
+    "started_at",
+    "ended_at",
+    "valid",
+    "scenario",
+    "node roles",
+    "p50",
+    "p95",
+    "p99",
+    "throughput",
+    "checksum failures",
+    "failures",
+    "retries",
+    "reconnects",
+    "timeouts",
+    "predicted upper-bound tokens/sec",
+    "data kind"
+  ]
+}

@@ -45,6 +45,32 @@ Measure the following before runtime claims:
 
 ## First Target Commands
 
+Loopback smoke on one host:
+
+Worker B:
+
+```bash
+zig build run-worker -- --node B --listen 127.0.0.1:7555
+```
+
+Worker C:
+
+```bash
+zig build run-worker -- --node C --listen 127.0.0.1:7556
+```
+
+Coordinator:
+
+```bash
+zig build run-coordinator -- \
+  --config configs/cluster.loopback.toml \
+  --scenario benchmarks/scenarios/loopback_transport_smoke.toml \
+  --out artifacts/runs/loopback-smoke
+```
+
+Real A/B/C cluster smoke after copying `configs/cluster.local.example.toml`
+to an untracked local config and replacing placeholder hostnames:
+
 Worker B:
 
 ```bash
@@ -99,4 +125,3 @@ If the network silently falls back to a slower path, the run must be marked inva
 Proceed to model metadata and placement simulation only after transport artifacts show a reproducible operating envelope.
 
 If the measured envelope is weak, publish the limit and revise the architecture before implementing transformer code.
-

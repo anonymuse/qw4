@@ -1,0 +1,7 @@
+schema_version,run_id,node_pair,direction,block_size_bytes,transfer_count,bytes_sent,checksum_algorithm,checksum_failures,duration_ms,mib_per_sec,gbps,concurrent_links,remote_expert_rate,scenario_step
+phase0.artifacts.v1,transport-smoke,A-B,send,1048576,40,41943040,sha256,0,84.0,476.19,3.99,none,0.5,block-1mib-solo
+phase0.artifacts.v1,transport-smoke,A-C,send,1048576,40,41943040,sha256,0,87.0,459.77,3.86,none,0.5,block-1mib-solo
+phase0.artifacts.v1,transport-smoke,A-B,send,4194304,40,167772160,sha256,0,290.0,551.72,4.63,none,0.5,block-4mib-solo
+phase0.artifacts.v1,transport-smoke,A-C,send,4194304,40,167772160,sha256,0,302.0,529.8,4.44,none,0.5,block-4mib-solo
+phase0.artifacts.v1,transport-smoke,A-B,send,4194304,40,167772160,sha256,0,314.0,510.0,4.28,"A-B,A-C",0.5,block-4mib-concurrent
+phase0.artifacts.v1,transport-smoke,A-C,send,4194304,40,167772160,sha256,0,321.0,498.0,4.18,"A-B,A-C",0.5,block-4mib-concurrent

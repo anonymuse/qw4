@@ -1,0 +1,87 @@
+# DS5 Phase 0 loopback config.
+# This is runnable on one machine and must never be interpreted as cluster hardware data.
+
+schema_version = 1
+config_name = "cluster.loopback"
+config_kind = "loopback"
+description = "Single-host loopback configuration for exercising the transport/artifact path."
+
+[interpretation]
+scope = "loopback"
+synthetic = true
+loopback = true
+real_cluster = false
+requires_user_network_config = false
+may_interpret_results_as_real_hardware_data = false
+results_warning = "Loopback results validate protocol and artifact plumbing only, not Thunderbolt or multi-host performance."
+
+[cluster]
+id = "ds5-loopback"
+coordinator_node = "A"
+worker_nodes = ["B", "C"]
+required_worker_count = 2
+distinct_physical_hosts_required = false
+intended_link = "localhost TCP loopback"
+network_path_must_be_recorded = false
+wifi_fallback_allowed = false
+static_weight_cap_gb_per_48gb_node = 33.6
+runtime_reserve_gb_per_48gb_node = 14.4
+aggregate_static_weight_cap_gb = 100.8
+refuse_static_cap_overrun_without_override = true
+
+[transport]
+protocol = "tcp"
+bind_host = "127.0.0.1"
+connect_timeout_ms = 2000
+read_timeout_ms = 10000
+heartbeat_interval_ms = 1000
+heartbeat_timeout_ms = 5000
+reconnect_attempts = 1
+checksum_required = true
+preferred_checksum_mode = "sha256"
+copy_measurement_required = true
+
+[artifacts]
+default_root = "artifacts/runs"
+record_git_commit = true
+record_hostnames = true
+record_macos_version = true
+record_power_mode = true
+record_confirmed_network_path = false
+
+[[nodes]]
+id = "A"
+role = "coordinator"
+hardware = "single-host loopback"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7554"
+connect_address = "127.0.0.1:7554"
+expected_runtime = "coordinator"
+core_model_weights_allowed = false
+
+[[nodes]]
+id = "B"
+role = "worker"
+hardware = "single-host loopback"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7555"
+connect_address = "127.0.0.1:7555"
+expected_runtime = "worker"
+core_model_weights_allowed = false
+static_weight_cap_gb = 0.0
+runtime_reserve_gb = 0.0
+
+[[nodes]]
+id = "C"
+role = "worker"
+hardware = "single-host loopback"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7556"
+connect_address = "127.0.0.1:7556"
+expected_runtime = "worker"
+core_model_weights_allowed = false
+static_weight_cap_gb = 0.0
+runtime_reserve_gb = 0.0
