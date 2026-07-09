@@ -62,6 +62,32 @@ The helper runs:
 - Qwen3 planning memory estimate;
 - Phase 0 summary generation.
 
+## Socket-Localhost Smoke
+
+After the single-process loopback smoke passes, run the two-process localhost
+TCP path:
+
+```bash
+RUN_DIR=artifacts/runs/socket-localhost-smoke \
+tools/local/socket-localhost-smoke.sh
+```
+
+Or through `make`:
+
+```bash
+make socket-localhost-smoke RUN_ID=socket-localhost-smoke
+```
+
+This helper starts worker B and worker C as separate local processes, runs the
+coordinator against `configs/cluster.socket-localhost.toml`, validates the
+generated artifact directory, and prints the summary plus worker logs.
+By default it uses `127.0.0.1:17555` and `127.0.0.1:17556` and writes a
+temporary config under `/private/tmp` so it does not collide with manual worker
+sessions on the documented 7555/7556 ports.
+
+Interpret the result as process-boundary and TCP-localhost validation only. It
+is still not Thunderbolt, RDMA-style, multi-host, or final model-inference data.
+
 ## Direct Commands
 
 Use these when debugging a specific stage.
@@ -93,6 +119,29 @@ python3 -B tools/report/validate_run.py artifacts/runs/m5-air-loopback-smoke
 
 ```bash
 python3 -B tools/report/summarize_phase0.py artifacts/runs/m5-air-loopback-smoke
+```
+
+Socket-localhost equivalent:
+
+```bash
+zig build --cache-dir /private/tmp/qw4-zig-cache \
+  --global-cache-dir /private/tmp/qw4-zig-global-cache \
+  --prefix /private/tmp/qw4-zig-out
+```
+
+```bash
+/private/tmp/qw4-zig-out/bin/ds5-worker --node B --listen 127.0.0.1:7555
+```
+
+```bash
+/private/tmp/qw4-zig-out/bin/ds5-worker --node C --listen 127.0.0.1:7556
+```
+
+```bash
+/private/tmp/qw4-zig-out/bin/ds5-coordinator \
+  --config configs/cluster.socket-localhost.toml \
+  --scenario benchmarks/scenarios/loopback_transport_smoke.toml \
+  --out artifacts/runs/socket-localhost-smoke
 ```
 
 ## Expected Results

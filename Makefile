@@ -5,7 +5,7 @@ PYTHONPYCACHEPREFIX ?= /private/tmp/qw4-pycache
 RUN_ID ?= local-smoke
 RUN_DIR ?= artifacts/runs/$(RUN_ID)
 
-.PHONY: build test loopback-smoke socket-workers socket-smoke validate-artifacts memory-estimate memory-sweep summarize-report aggregate-report qwen-moe-sim
+.PHONY: build test loopback-smoke socket-workers socket-smoke socket-localhost-smoke validate-artifacts memory-estimate memory-sweep summarize-report aggregate-report qwen-moe-sim
 
 build:
 	zig build --cache-dir $(ZIG_CACHE_DIR) --global-cache-dir $(ZIG_GLOBAL_CACHE_DIR) --prefix $(ZIG_PREFIX)
@@ -24,6 +24,9 @@ socket-workers:
 
 socket-smoke:
 	zig build run-coordinator -- --config configs/cluster.socket-localhost.toml --scenario benchmarks/scenarios/loopback_transport_smoke.toml --out $(RUN_DIR)
+
+socket-localhost-smoke:
+	RUN_DIR=$(RUN_DIR) ZIG_CACHE_DIR=$(ZIG_CACHE_DIR) ZIG_GLOBAL_CACHE_DIR=$(ZIG_GLOBAL_CACHE_DIR) ZIG_PREFIX=$(ZIG_PREFIX) tools/local/socket-localhost-smoke.sh
 
 validate-artifacts:
 	python3 tools/report/validate_run.py $(RUN_DIR)
