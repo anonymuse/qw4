@@ -82,6 +82,18 @@
           "type": "string",
           "minLength": 1
         },
+        "transport_mode": {
+          "type": "string"
+        },
+        "socket_mode": {
+          "type": "string"
+        },
+        "loopback": {
+          "type": "boolean"
+        },
+        "confirmed_network_path": {
+          "type": "string"
+        },
         "hardware_interpretable": {
           "type": "boolean"
         }
@@ -115,6 +127,7 @@
           "enum": [
             "synthetic",
             "loopback",
+            "socket_localhost",
             "real_cluster"
           ]
         },
@@ -506,6 +519,15 @@
         "p99_us": {
           "type": "number",
           "minimum": 0
+        },
+        "measurement_mode": {
+          "enum": [
+            "solo",
+            "concurrent"
+          ]
+        },
+        "concurrent_links": {
+          "type": "string"
         }
       }
     },
@@ -553,6 +575,15 @@
         "gbps": {
           "type": "number",
           "minimum": 0
+        },
+        "measurement_mode": {
+          "enum": [
+            "solo",
+            "concurrent"
+          ]
+        },
+        "concurrent_links": {
+          "type": "string"
         }
       }
     }

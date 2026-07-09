@@ -205,6 +205,7 @@ def throughput_rows(rows: list[dict[str, str]], limit: int = 24) -> list[list[st
             [
                 row_value(row, "node_pair", "pair", "link", "route"),
                 row_value(row, "block_size_bytes", "block_bytes", "size_bytes", "bytes"),
+                row_value(row, "concurrent_links"),
                 row_value(row, "transfer_count", "transfers", "samples", "count"),
                 row_value(
                     row,
@@ -220,8 +221,30 @@ def throughput_rows(rows: list[dict[str, str]], limit: int = 24) -> list[list[st
             ]
         )
     if len(rows) > limit:
-        rendered.append([f"truncated after {limit} rows", MISSING, MISSING, MISSING, MISSING])
+        rendered.append([f"truncated after {limit} rows", MISSING, MISSING, MISSING, MISSING, MISSING])
     return rendered
+
+
+def interference_rows(run: dict[str, Any], limit: int = 24) -> list[list[str]]:
+    interference = get_path(run, "metrics.concurrent_link_interference")
+    if not isinstance(interference, list):
+        return []
+
+    rows: list[list[str]] = []
+    for item in interference[:limit]:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            [
+                value_or_missing(get_path(item, "node_pair")),
+                value_or_missing(get_path(item, "solo_mib_per_sec")),
+                value_or_missing(get_path(item, "concurrent_mib_per_sec")),
+                value_or_missing(get_path(item, "degradation_pct")),
+            ]
+        )
+    if len(interference) > limit:
+        rows.append([f"truncated after {limit} rows", MISSING, MISSING, MISSING])
+    return rows
 
 
 def sensitivity_rows(run: dict[str, Any], limit: int = 24) -> list[list[str]]:
@@ -375,8 +398,21 @@ def run_summary(run_dir: Path) -> tuple[str, int]:
     if throughput:
         lines.extend(
             table(
-                ["Node pair", "Block bytes", "Transfers", "Throughput", "Checksum cost"],
+                ["Node pair", "Block bytes", "Concurrent links", "Transfers", "Throughput", "Checksum cost"],
                 throughput_rows(throughput),
+            )
+        )
+    else:
+        lines.append(MISSING)
+    lines.append("")
+    lines.append("## Concurrent Link Interference")
+    lines.append("")
+    interference = interference_rows(run)
+    if interference:
+        lines.extend(
+            table(
+                ["Node pair", "Solo MiB/s", "Concurrent MiB/s", "Degradation pct"],
+                interference,
             )
         )
     else:

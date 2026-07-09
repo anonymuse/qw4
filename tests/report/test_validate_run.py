@@ -70,6 +70,17 @@ class ValidateRunTests(unittest.TestCase):
             self.mutate_run_json(run_dir, mutate)
             validate_run.validate_artifact_set(run_dir)
 
+    def test_concurrent_link_interference_requires_degradation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            run_dir = self.copy_fixture(Path(tmp_raw))
+
+            def mutate(data):
+                data["metrics"]["concurrent_link_interference"][0].pop("degradation_pct")
+
+            self.mutate_run_json(run_dir, mutate)
+            with self.assertRaises(validate_run.ValidationError):
+                validate_run.validate_artifact_set(run_dir)
+
 
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
