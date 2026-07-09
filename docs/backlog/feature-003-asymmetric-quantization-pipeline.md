@@ -1,6 +1,6 @@
 # Feature DS5-F003: Asymmetric Quantization Pipeline
 
-Status: in progress as Python planning and memory estimation; Zig runtime goal not met.
+Status: deferred until placement-contract and Phase 0 transport gates justify deeper runtime work; Python planning and memory estimation exist, Zig runtime goal not met.
 
 Epic: `DS5-E03: Quantization And Memory Runtime`
 
@@ -8,7 +8,7 @@ Complexity Score: 8/10 for Zig 1.0 bare-metal implementation difficulty.
 
 PM Validation Gate: `PM-GATE-QNT-01: Quantization Envelope And Quality-Drift Evidence`
 
-Governing baseline: `DS5_Model_Runtime_Placement_Spec_v0.2_Qwen3_235B_A22B.md`, `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/assumptions.md), and [Risk Register](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/risk-register.md).
+Governing baseline: `DS5_Model_Runtime_Placement_Spec_v0.2_Qwen3_235B_A22B.md`, `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](../assumptions.md), [Risk Register](../risk-register.md), and [Project Plan After ARB Refresh](project-plan.md).
 
 ## Technical Scope
 
@@ -55,4 +55,3 @@ The merge request must attach or reference:
 - Any low-bit router or gate quantization without PM-approved evidence.
 - Any claim that IQ2 or BitNet quality is acceptable before quality-drift measurements exist.
 - Any acceptance profile that only proves fit on aggregate 144GB memory rather than per-node caps.
-

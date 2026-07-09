@@ -1,6 +1,6 @@
 # Feature DS5-F002: Fused Gating And Zero-Copy Routing Protocol
 
-Status: in progress as Phase 0 transport scaffolding; fused routing goal not met.
+Status: blocked until `DS5-F000: Phase 0 Transport Finding` supports continued distributed decode work; fused routing goal not met.
 
 Epic: `DS5-E02: Routing Transport`
 
@@ -8,7 +8,7 @@ Complexity Score: 9/10 for Zig 1.0 bare-metal implementation difficulty.
 
 PM Validation Gate: `PM-GATE-TR-01: Thunderbolt Block-Routing Transport Evidence`
 
-Governing baseline: `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [Minimum Viable Finding](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/minimum-viable-finding.md), and [ADR-002](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/decisions/ADR-002-phase0-transport-first.md).
+Governing baseline: `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [Minimum Viable Finding](../minimum-viable-finding.md), [ADR-002](../decisions/ADR-002-phase0-transport-first.md), and [DS5-F000](feature-000-phase0-transport-finding.md).
 
 ## Technical Scope
 
@@ -25,6 +25,10 @@ Existing implementation signals:
 - `src/transport/root.zig` contains Phase 0 frame/transport machinery.
 - `benchmarks/scenarios/qwen3_moe_transport_smoke.toml` contains synthetic Qwen-shaped traffic.
 - No Thunderbolt-specific zero-copy implementation or fused routing packet exists yet.
+
+Prerequisite:
+
+- Complete `DS5-F000` with target-hardware transport artifacts before implementing fused routing. Loopback or scaffold results may inform this feature, but they do not unblock it.
 
 ## Rigid Acceptance Criteria
 
@@ -67,4 +71,3 @@ The merge request must attach or reference:
 - Any block sync result at or above 8 microseconds without a PM-approved scope change or ADR.
 - Any performance claim based only on localhost, synthetic sleep timing, or unchecked payloads.
 - Any routing shortcut that changes Qwen top-8 semantics to fit topology.
-
