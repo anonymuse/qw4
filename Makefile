@@ -5,14 +5,14 @@ PYTHONPYCACHEPREFIX ?= /private/tmp/qw4-pycache
 RUN_ID ?= local-smoke
 RUN_DIR ?= artifacts/runs/$(RUN_ID)
 
-.PHONY: build test loopback-smoke socket-workers socket-smoke socket-localhost-smoke validate-artifacts memory-estimate memory-sweep pdd-topology-validate routing-plan-validate summarize-report aggregate-report qwen-moe-sim
+.PHONY: build test loopback-smoke socket-workers socket-smoke socket-localhost-smoke validate-artifacts memory-estimate memory-sweep pdd-topology-validate summarize-report aggregate-report qwen-moe-sim
 
 build:
 	zig build --cache-dir $(ZIG_CACHE_DIR) --global-cache-dir $(ZIG_GLOBAL_CACHE_DIR) --prefix $(ZIG_PREFIX)
 
 test:
 	zig build test --cache-dir $(ZIG_CACHE_DIR) --global-cache-dir $(ZIG_GLOBAL_CACHE_DIR) --prefix $(ZIG_PREFIX)
-	PYTHONPYCACHEPREFIX=$(PYTHONPYCACHEPREFIX) python3 -m unittest tests.report.test_validate_run tests.model.test_pdd_topology tests.model.test_routing_plan
+	PYTHONPYCACHEPREFIX=$(PYTHONPYCACHEPREFIX) python3 -m unittest tests.report.test_validate_run tests.model.test_pdd_topology
 
 loopback-smoke:
 	zig build run-coordinator -- --config configs/cluster.loopback.toml --scenario benchmarks/scenarios/loopback_transport_smoke.toml --out $(RUN_DIR)
@@ -39,9 +39,6 @@ memory-sweep:
 
 pdd-topology-validate:
 	python3 tools/model_inspect/validate_pdd_topology.py --manifest configs/qwen3_pdd_topology_phase1.json --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json --summary-out docs/findings/ds5-f001-pdd-topology-acceptance.md
-
-routing-plan-validate:
-	python3 tools/model_inspect/validate_routing_plan.py --manifest configs/qwen3_fused_routing_phase0.json --artifact-out artifacts/routing/ds5-f002-routing-payload.json --summary-out docs/findings/ds5-f002-routing-scaffold.md
 
 summarize-report:
 	python3 tools/report/summarize_phase0.py $(RUN_DIR)

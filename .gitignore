@@ -3,7 +3,6 @@
 zig-out/
 artifacts/runs/
 artifacts/pdd/
-artifacts/routing/
 *.log
 __pycache__/
 *.pyc
