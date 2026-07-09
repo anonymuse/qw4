@@ -40,7 +40,7 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/5e1a/qw4`.
 | Concurrent transport harness | merged | PR #5 `codex/add-concurrent-transport-harness` merged to `main` at `1a435ba`; branch tip `b99a9d9` is reachable. | Treat associated clean worktree as cleanup candidate after owner confirmation. |
 | DS5-F001 PDD topology | merged | PR #8 `codex/ds5-f001-pdd-topology` merged to `main` at `310ad6d`; remote PR tip `df32794` is merged, while local branch tip `a483426` is a clean divergent equivalent/older local tip. | Review local branch before branch cleanup; preserve until confirmed redundant. |
 | DS5-F001 PDD artifacts | merged | PR #12 `codex/ds5-f001-pdd-artifacts` merged to `main` at `90b3fbd` on 2026-07-09. | Treat as scaffold/planning evidence only; complete `DS5-F001A` before deeper runtime work. |
-| Open PRs | one draft | `gh pr list --state open --limit 50` found draft PR #13 `codex/ds5-f002-routing-scaffold` on 2026-07-09. | Review against the ARB gate order before merging. |
+| Open PRs | two drafts | Draft PR #13 `codex/ds5-f002-routing-scaffold`; draft PR #14 `codex/arb-plan-refresh`. | Review PR #14 first, then review PR #13 against the ARB gate order before merging. |
 
 ## Task Board
 
@@ -51,7 +51,7 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/5e1a/qw4`.
 | C | unassigned | merged seed | PR #3, PR #4, and PR #5 | `src/transport/`, transport smoke command | loopback transport smoke command | `docs/work-packs/2026-07-09-overnight/agent-c-loopback-transport.md` |
 | D | unassigned | merged seed | PR #2 and later integration branches | `configs/`, `benchmarks/scenarios/` | scenario parser or smoke run | `docs/work-packs/2026-07-09-overnight/agent-d-configs-scenarios.md` |
 | E / DS5-F001 | unassigned | umbrella split after ARB review | PR #12 merged to `main` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/`, `docs/backlog/` | Subfeature-specific validation | Parent feature is now split into `DS5-F001A` planning hardening and `DS5-F001B` runtime evidence. |
-| ARB-PLAN | Codex | ready for review | `codex/arb-plan-refresh` / `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `README.md`, `docs/backlog/`, `docs/coordination/active-board.md` | `git diff --check` | Incorporates `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` into project plan and feature goals. |
+| ARB-PLAN | Codex | draft PR #14 | `codex/arb-plan-refresh` / `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `README.md`, `docs/backlog/`, `docs/coordination/active-board.md` | `git diff --cached --check` | Incorporates `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` into project plan and feature goals. |
 | DS5-F001A | unassigned | next feature work | fresh branch needed from `main` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/`, `docs/backlog/` | `make test`; `make pdd-topology-validate` | Harden placement contract, model constants, evidence metadata, context assumption, tensor-class placeholders, runtime-path constraints, and schema-authority docs. |
 | DS5-F000 | unassigned | queued after `DS5-F001A` | fresh branch needed from `main` | `src/transport/`, `benchmarks/`, `tools/report/`, `docs/findings/`, `docs/backlog/` | target-hardware A/B/C run plus artifact schema validation | Answer Phase 0 transport go/no-go before fused routing or model-runtime work. |
 | DS5-F001B | unassigned | queued after `DS5-F001A` and Phase 0 go/no-go | fresh branch needed from `main` | runtime startup paths, `src/model/`, `tools/model_inspect/`, `configs/`, `docs/findings/`, `docs/backlog/` | startup/warmup memory ledger validation and worker ownership logs | Prove runtime placement behavior separately from scaffold/planning evidence. |
@@ -64,7 +64,7 @@ Classification rules: `active` means still tied to an open coordination task or 
 | Path | Branch or commit | Clean/dirty | Related PR/branch/task | Classification | Recommendation | Prune safety |
 |---|---|---|---|---|---|---|
 | `/Users/jessewhite/Code/personal/qw4` | `main` at `90b3fbd` | clean | primary checkout, `origin/main` | active | Preserve as stable integration checkout. | preserve |
-| `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `codex/arb-plan-refresh` at `90b3fbd` plus docs edits | dirty | ARB project-plan refresh | active | Review and merge after validation; preserve until merged or explicitly abandoned. | preserve |
+| `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `codex/arb-plan-refresh` at `4cbd099` plus PR #14 board update | dirty | draft PR #14 | active | Review and merge after validation; preserve until merged or explicitly abandoned. | preserve |
 | `/Users/jessewhite/.codex/worktrees/b5b8/qw4` | `codex/ds5-f001-pdd-artifacts` at `0c9c944` | clean | PR #12 merged to `main` at `90b3fbd` | merged | Cleanup candidate after owner confirmation. | confirm before prune |
 | `/Users/jessewhite/.codex/worktrees/dd81/qw4` | `codex/ds5-f002-routing-scaffold` at `63a52a5` | clean | draft PR #13 | active review | Preserve; review against the ARB gate order before merge. | preserve |
 
@@ -88,7 +88,7 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 
 | Branch | Status | Evidence | Next action |
 |---|---|---|---|
-| `codex/arb-plan-refresh` | active review | Current docs-only branch incorporates the 20260609 ARB feedback into the project plan, backlog feature split, and active board. | Review and merge after docs validation. |
+| `codex/arb-plan-refresh` | draft PR #14 | Current docs-only branch incorporates the 20260609 ARB feedback into the project plan, backlog feature split, and active board. | Review and merge after docs validation. |
 | `codex/ds5-f001-pdd-artifacts` | merged branch cleanup | Branch tip `0c9c944` is included in the PR #12 merge at `90b3fbd`; worktree `/Users/jessewhite/.codex/worktrees/b5b8/qw4` is clean. | Delete branch or prune worktree only after separate confirmation. |
 | `codex/ds5-f002-routing-scaffold` | draft PR #13 with ARB gate conflict risk | Branch tip `63a52a5` exists on origin and starts after `90b3fbd`, but F002 is now blocked behind `DS5-F001A` and `DS5-F000`. | Preserve; rebase or retarget after the ARB plan lands, and do not merge as runtime progress until prerequisites are resolved. |
 
@@ -104,7 +104,7 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 |---|---|---|---|
 | Confirm build and test commands | all tasks | open | Keep commands in runbooks once stable. |
 | Decide whether to keep `docs/backlog/` as aliases only | coordination | open | `docs/backlog/README.md` is currently a real feature catalogue; keep `docs/coordination/` as the active operating board. |
-| Incorporate ARB feedback into feature plan | `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` | in review | Branch `codex/arb-plan-refresh` adds the ARB project plan and splits `DS5-F001` into `DS5-F001A` and `DS5-F001B`, with `DS5-F000` inserted before fused routing. |
+| Incorporate ARB feedback into feature plan | draft PR #14 / `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` | in review | Branch `codex/arb-plan-refresh` adds the ARB project plan and splits `DS5-F001` into `DS5-F001A` and `DS5-F001B`, with `DS5-F000` inserted before fused routing. |
 | Review F002 routing scaffold against ARB gate order | draft PR #13 / `codex/ds5-f002-routing-scaffold` | open | Preserve the branch, but do not treat F002 as unblocked until `DS5-F001A` and `DS5-F000` are resolved. |
 | Clean up merged F001 artifact branch/worktree | `codex/ds5-f001-pdd-artifacts` | open | PR #12 is merged and the worktree is clean; prune/delete only after explicit branch-cleanup confirmation. |
 
@@ -119,7 +119,7 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 
 ## Next Coordinator Actions
 
-1. Review and merge `codex/arb-plan-refresh`, then start `DS5-F001A` from `main`.
+1. Review and merge draft PR #14 `codex/arb-plan-refresh`, then start `DS5-F001A` from `main`.
 2. After `DS5-F001A`, run `DS5-F000` on the target A/B/C topology before fused routing or model-runtime work.
 3. Review draft PR #13 `codex/ds5-f002-routing-scaffold` against the ARB gate order; preserve it, but do not merge it as unblocked runtime work unless prerequisites are satisfied or scope is narrowed.
 4. Confirm whether to prune `/Users/jessewhite/.codex/worktrees/b5b8/qw4` and delete `codex/ds5-f001-pdd-artifacts` now that PR #12 is merged.
