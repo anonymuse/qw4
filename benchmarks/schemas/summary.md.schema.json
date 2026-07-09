@@ -24,12 +24,17 @@
     "p95",
     "p99",
     "throughput",
+    "concurrent-link interference",
     "checksum failures",
     "failures",
     "retries",
     "reconnects",
     "timeouts",
+    "scheduler overhead",
+    "bytes sent per simulated token",
+    "per-layer simulated transport time",
     "predicted upper-bound tokens/sec",
+    "hardware-interpretable",
     "data kind"
   ]
 }

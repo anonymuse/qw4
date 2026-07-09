@@ -31,6 +31,23 @@ NODE_ID_RE = re.compile(r"^[A-Z][A-Z0-9_-]*$")
 NODE_PAIR_RE = re.compile(r"^[A-Z][A-Z0-9_-]*-[A-Z][A-Z0-9_-]*$")
 TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 
+EXPECTED_NODE_ROLES = {
+    "A": "coordinator",
+    "B": "worker",
+    "C": "worker",
+}
+EXPECTED_WORKER_PAIRS = {"A-B", "A-C"}
+EXPECTED_QWEN_SHAPE = {
+    "layers": 94,
+    "hidden_size": 4096,
+    "top_k": 8,
+    "packets_per_destination_per_layer": 1,
+}
+EXPECTED_LAYER_OWNERS = {
+    "B": (0, 46),
+    "C": (47, 93),
+}
+
 LATENCY_HEADER = [
     "schema_version",
     "run_id",
@@ -165,6 +182,20 @@ def validate_percentiles(obj: Any, label: str) -> None:
         fail(f"{label}: expected p50 <= p95 <= p99")
 
 
+def rate_key(value: Any) -> str:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        fail("rate: expected numeric remote expert rate")
+    return f"{float(value):.12g}"
+
+
+def expected_grid(pairs: set[str], values: set[int]) -> set[tuple[str, int]]:
+    return {(pair, value) for pair in pairs for value in values}
+
+
+def format_missing_grid(missing: set[tuple[str, int]]) -> str:
+    return ", ".join(f"{pair}:{value}" for pair, value in sorted(missing))
+
+
 def validate_run_json(run_dir: Path) -> dict[str, Any]:
     run = require_object(read_json(run_dir / "run.json"), "run.json")
     require_keys(
@@ -253,6 +284,10 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
     )
     if scenario["kind"] not in {"synthetic", "loopback", "socket_localhost", "real_cluster"}:
         fail("run.json.scenario.kind: expected synthetic, loopback, socket_localhost, or real_cluster")
+    if hardware_interpretable and scenario["kind"] != "real_cluster":
+        fail("run.json.environment.hardware_interpretable: requires scenario.kind real_cluster")
+    if hardware_interpretable and not str(environment.get("confirmed_network_path", "")).strip():
+        fail("run.json.environment.confirmed_network_path: required for hardware-interpretable runs")
     require_str(scenario, "name", "run.json.scenario")
     require_str(scenario, "config_path", "run.json.scenario")
     require_int(scenario, "transfer_count", "run.json.scenario", 1)
@@ -272,24 +307,30 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
         "run.json.scenario.qwen_shape",
         {"layers", "hidden_size", "top_k", "packets_per_destination_per_layer", "layer_owners"},
     )
-    require_int(qwen_shape, "layers", "run.json.scenario.qwen_shape", 1)
-    require_int(qwen_shape, "hidden_size", "run.json.scenario.qwen_shape", 1)
-    require_int(qwen_shape, "top_k", "run.json.scenario.qwen_shape", 1)
-    require_int(qwen_shape, "packets_per_destination_per_layer", "run.json.scenario.qwen_shape", 1)
+    for key, expected in EXPECTED_QWEN_SHAPE.items():
+        observed = require_int(qwen_shape, key, "run.json.scenario.qwen_shape", 1)
+        if observed != expected:
+            fail(f"run.json.scenario.qwen_shape.{key}: expected DS5-F000 value {expected}")
     layer_owners = require_array(qwen_shape["layer_owners"], "run.json.scenario.qwen_shape.layer_owners")
+    observed_layer_owners: dict[str, tuple[int, int]] = {}
     for index, owner_value in enumerate(layer_owners):
         owner = require_object(owner_value, f"run.json.scenario.qwen_shape.layer_owners[{index}]")
         require_keys(owner, f"run.json.scenario.qwen_shape.layer_owners[{index}]", {"node_id", "start_layer", "end_layer"})
-        if not NODE_ID_RE.match(require_str(owner, "node_id", f"run.json.scenario.qwen_shape.layer_owners[{index}]")):
+        owner_node_id = require_str(owner, "node_id", f"run.json.scenario.qwen_shape.layer_owners[{index}]")
+        if not NODE_ID_RE.match(owner_node_id):
             fail(f"run.json.scenario.qwen_shape.layer_owners[{index}].node_id: invalid node ID")
         start = require_int(owner, "start_layer", f"run.json.scenario.qwen_shape.layer_owners[{index}]", 0)
         end = require_int(owner, "end_layer", f"run.json.scenario.qwen_shape.layer_owners[{index}]", 0)
         if end < start:
             fail(f"run.json.scenario.qwen_shape.layer_owners[{index}]: end_layer before start_layer")
+        observed_layer_owners[owner_node_id] = (start, end)
+    if observed_layer_owners != EXPECTED_LAYER_OWNERS:
+        fail("run.json.scenario.qwen_shape.layer_owners: expected B 0-46 and C 47-93")
 
     nodes = require_array(run["nodes"], "run.json.nodes")
     roles = set()
     node_ids = set()
+    node_roles: dict[str, str] = {}
     for index, node_value in enumerate(nodes):
         node = require_object(node_value, f"run.json.nodes[{index}]")
         require_keys(node, f"run.json.nodes[{index}]", {"node_id", "role", "hostname", "hardware_label", "transport"})
@@ -301,11 +342,15 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
         if role not in {"coordinator", "worker"}:
             fail(f"run.json.nodes[{index}].role: expected coordinator or worker")
         roles.add(role)
+        node_roles[node_id] = role
         require_str(node, "hostname", f"run.json.nodes[{index}]")
         require_str(node, "hardware_label", f"run.json.nodes[{index}]")
         require_str(node, "transport", f"run.json.nodes[{index}]")
     if "coordinator" not in roles or "worker" not in roles:
         fail("run.json.nodes: expected at least one coordinator and one worker")
+    for node_id, expected_role in EXPECTED_NODE_ROLES.items():
+        if node_roles.get(node_id) != expected_role:
+            fail(f"run.json.nodes: expected node {node_id} with role {expected_role}")
 
     checksums = require_object(run["checksums"], "run.json.checksums")
     require_keys(checksums, "run.json.checksums", {"algorithm", "total_transfers", "passed", "failed", "status"})
@@ -339,13 +384,16 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
             "predicted_upper_bound_tokens_per_sec",
         },
     )
-    validate_latency_metrics(metrics["latency_by_message_size"])
-    validate_throughput_metrics(metrics["throughput_by_block_size"])
+    message_sizes = set(scenario["message_sizes_bytes"])
+    block_sizes = set(scenario["block_sizes_bytes"])
+    remote_rate_keys = {rate_key(rate) for rate in rates}
+    validate_latency_metrics(metrics["latency_by_message_size"], message_sizes)
+    validate_throughput_metrics(metrics["throughput_by_block_size"], block_sizes)
     validate_percentiles(metrics["scheduler_overhead_us_per_token"], "run.json.metrics.scheduler_overhead_us_per_token")
     validate_percentiles(metrics["per_layer_transport_time_us"], "run.json.metrics.per_layer_transport_time_us")
     require_int(metrics, "bytes_sent_per_simulated_token", "run.json.metrics", 0)
     validate_concurrent_link_metrics(metrics["concurrent_link_interference"])
-    validate_token_predictions(metrics["predicted_upper_bound_tokens_per_sec"])
+    validate_token_predictions(metrics["predicted_upper_bound_tokens_per_sec"], remote_rate_keys)
 
     artifacts = require_object(run["artifacts"], "run.json.artifacts")
     expected_artifacts = {
@@ -366,8 +414,9 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
     return run
 
 
-def validate_latency_metrics(metrics: Any) -> None:
+def validate_latency_metrics(metrics: Any, message_sizes: set[int]) -> None:
     rows = require_array(metrics, "run.json.metrics.latency_by_message_size")
+    observed = set()
     for index, metric_value in enumerate(rows):
         metric = require_object(metric_value, f"run.json.metrics.latency_by_message_size[{index}]")
         require_keys(
@@ -375,9 +424,11 @@ def validate_latency_metrics(metrics: Any) -> None:
             f"run.json.metrics.latency_by_message_size[{index}]",
             {"node_pair", "message_size_bytes", "sample_count", "checksum_failures", "p50_us", "p95_us", "p99_us"},
         )
-        if not NODE_PAIR_RE.match(require_str(metric, "node_pair", f"run.json.metrics.latency_by_message_size[{index}]")):
+        node_pair = require_str(metric, "node_pair", f"run.json.metrics.latency_by_message_size[{index}]")
+        if not NODE_PAIR_RE.match(node_pair):
             fail(f"run.json.metrics.latency_by_message_size[{index}].node_pair: invalid node pair")
-        require_int(metric, "message_size_bytes", f"run.json.metrics.latency_by_message_size[{index}]", 1)
+        message_size = require_int(metric, "message_size_bytes", f"run.json.metrics.latency_by_message_size[{index}]", 1)
+        observed.add((node_pair, message_size))
         require_int(metric, "sample_count", f"run.json.metrics.latency_by_message_size[{index}]", 1)
         require_int(metric, "checksum_failures", f"run.json.metrics.latency_by_message_size[{index}]", 0)
         p50 = require_number(metric, "p50_us", f"run.json.metrics.latency_by_message_size[{index}]")
@@ -385,10 +436,14 @@ def validate_latency_metrics(metrics: Any) -> None:
         p99 = require_number(metric, "p99_us", f"run.json.metrics.latency_by_message_size[{index}]")
         if not (p50 <= p95 <= p99):
             fail(f"run.json.metrics.latency_by_message_size[{index}]: expected p50_us <= p95_us <= p99_us")
+    missing = expected_grid(EXPECTED_WORKER_PAIRS, message_sizes) - observed
+    if missing:
+        fail(f"run.json.metrics.latency_by_message_size: missing A/B/C coverage {format_missing_grid(missing)}")
 
 
-def validate_throughput_metrics(metrics: Any) -> None:
+def validate_throughput_metrics(metrics: Any, block_sizes: set[int]) -> None:
     rows = require_array(metrics, "run.json.metrics.throughput_by_block_size")
+    observed = set()
     for index, metric_value in enumerate(rows):
         metric = require_object(metric_value, f"run.json.metrics.throughput_by_block_size[{index}]")
         require_keys(
@@ -405,19 +460,25 @@ def validate_throughput_metrics(metrics: Any) -> None:
                 "gbps",
             },
         )
-        if not NODE_PAIR_RE.match(require_str(metric, "node_pair", f"run.json.metrics.throughput_by_block_size[{index}]")):
+        node_pair = require_str(metric, "node_pair", f"run.json.metrics.throughput_by_block_size[{index}]")
+        if not NODE_PAIR_RE.match(node_pair):
             fail(f"run.json.metrics.throughput_by_block_size[{index}].node_pair: invalid node pair")
-        require_int(metric, "block_size_bytes", f"run.json.metrics.throughput_by_block_size[{index}]", 1)
+        block_size = require_int(metric, "block_size_bytes", f"run.json.metrics.throughput_by_block_size[{index}]", 1)
+        observed.add((node_pair, block_size))
         require_int(metric, "transfer_count", f"run.json.metrics.throughput_by_block_size[{index}]", 1)
         require_int(metric, "bytes_sent", f"run.json.metrics.throughput_by_block_size[{index}]", 1)
         require_int(metric, "checksum_failures", f"run.json.metrics.throughput_by_block_size[{index}]", 0)
         require_number(metric, "duration_ms", f"run.json.metrics.throughput_by_block_size[{index}]", 0.000001)
         require_number(metric, "mib_per_sec", f"run.json.metrics.throughput_by_block_size[{index}]")
         require_number(metric, "gbps", f"run.json.metrics.throughput_by_block_size[{index}]")
+    missing = expected_grid(EXPECTED_WORKER_PAIRS, block_sizes) - observed
+    if missing:
+        fail(f"run.json.metrics.throughput_by_block_size: missing A/B/C coverage {format_missing_grid(missing)}")
 
 
 def validate_concurrent_link_metrics(metrics: Any) -> None:
     rows = require_array(metrics, "run.json.metrics.concurrent_link_interference")
+    observed_pairs = set()
     for index, metric_value in enumerate(rows):
         metric = require_object(metric_value, f"run.json.metrics.concurrent_link_interference[{index}]")
         require_keys(
@@ -425,26 +486,56 @@ def validate_concurrent_link_metrics(metrics: Any) -> None:
             f"run.json.metrics.concurrent_link_interference[{index}]",
             {"node_pair", "solo_mib_per_sec", "concurrent_mib_per_sec", "degradation_pct"},
         )
-        if not NODE_PAIR_RE.match(require_str(metric, "node_pair", f"run.json.metrics.concurrent_link_interference[{index}]")):
+        node_pair = require_str(metric, "node_pair", f"run.json.metrics.concurrent_link_interference[{index}]")
+        if not NODE_PAIR_RE.match(node_pair):
             fail(f"run.json.metrics.concurrent_link_interference[{index}].node_pair: invalid node pair")
+        observed_pairs.add(node_pair)
         require_number(metric, "solo_mib_per_sec", f"run.json.metrics.concurrent_link_interference[{index}]")
         require_number(metric, "concurrent_mib_per_sec", f"run.json.metrics.concurrent_link_interference[{index}]")
         require_number(metric, "degradation_pct", f"run.json.metrics.concurrent_link_interference[{index}]", -100.0)
+    missing = sorted(EXPECTED_WORKER_PAIRS - observed_pairs)
+    if missing:
+        fail(f"run.json.metrics.concurrent_link_interference: missing node pair(s): {', '.join(missing)}")
 
 
-def validate_token_predictions(predictions: Any) -> None:
+def validate_token_predictions(predictions: Any, remote_rate_keys: set[str]) -> None:
     rows = require_array(predictions, "run.json.metrics.predicted_upper_bound_tokens_per_sec")
+    observed_rate_keys = set()
     for index, prediction_value in enumerate(rows):
         prediction = require_object(prediction_value, f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
         require_keys(
             prediction,
             f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]",
-            {"remote_expert_rate", "tokens_per_sec"},
+            {
+                "remote_expert_rate",
+                "local_expert_rate",
+                "bytes_per_simulated_token",
+                "simulated_transport_time_us_per_token",
+                "scheduler_overhead_us_per_token",
+                "tokens_per_sec",
+                "formula",
+            },
         )
         rate = require_number(prediction, "remote_expert_rate", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
         if rate > 1:
             fail(f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}].remote_expert_rate: expected <= 1")
+        local_rate = require_number(prediction, "local_expert_rate", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
+        if local_rate > 1:
+            fail(f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}].local_expert_rate: expected <= 1")
+        if abs((rate + local_rate) - 1.0) > 0.000001:
+            fail(f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]: local_expert_rate + remote_expert_rate must equal 1")
+        observed_rate_keys.add(rate_key(rate))
+        require_int(prediction, "bytes_per_simulated_token", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]", 0)
+        require_number(prediction, "simulated_transport_time_us_per_token", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
+        require_number(prediction, "scheduler_overhead_us_per_token", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
         require_number(prediction, "tokens_per_sec", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
+        require_str(prediction, "formula", f"run.json.metrics.predicted_upper_bound_tokens_per_sec[{index}]")
+    missing = sorted(remote_rate_keys - observed_rate_keys)
+    extra = sorted(observed_rate_keys - remote_rate_keys)
+    if missing:
+        fail(f"run.json.metrics.predicted_upper_bound_tokens_per_sec: missing remote expert rate(s): {', '.join(missing)}")
+    if extra:
+        fail(f"run.json.metrics.predicted_upper_bound_tokens_per_sec: unexpected remote expert rate(s): {', '.join(extra)}")
 
 
 def validate_events(run_dir: Path, run: dict[str, Any]) -> list[dict[str, Any]]:
@@ -466,6 +557,15 @@ def validate_events(run_dir: Path, run: dict[str, Any]) -> list[dict[str, Any]]:
 
     seen_sequences = set()
     event_types = set()
+    node_discovered_nodes = set()
+    worker_health_nodes = set()
+    latency_pairs = set()
+    throughput_pairs = set()
+    checksum_failure_events = 0
+    failure_events = 0
+    retry_events = 0
+    reconnect_events = 0
+    timeout_events = 0
     previous_sequence = -1
     for line_number, event in enumerate(events, 1):
         label = f"events.jsonl:{line_number}"
@@ -491,19 +591,68 @@ def validate_events(run_dir: Path, run: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(event["details"], dict):
             fail(f"{label}.details: expected object")
         validate_event_type_fields(event, label)
+        if event_type == "node_discovered":
+            node_discovered_nodes.add(event["node_id"])
+        elif event_type == "worker_health":
+            worker_health_nodes.add(event["node_id"])
+        elif event_type == "latency_sample":
+            latency_pairs.add(event["node_pair"])
+        elif event_type == "throughput_sample":
+            throughput_pairs.add(event["node_pair"])
+        elif event_type == "checksum_verified" and event.get("checksum_status") == "fail":
+            checksum_failure_events += 1
+        elif event_type == "failure_observed":
+            failure_events += 1
+            if "timeout" in str(event.get("failure_kind", "")).lower():
+                timeout_events += 1
+        elif event_type == "retry_scheduled":
+            retry_events += 1
+        elif event_type == "reconnect_succeeded":
+            reconnect_events += 1
+        elif event_type == "run_completed" and event["valid"] != run["valid"]:
+            fail(f"{label}.valid: does not match run.json.valid")
 
-    required_types = {"run_started", "worker_health", "latency_sample", "throughput_sample", "checksum_verified", "run_completed"}
+    required_types = {
+        "run_started",
+        "node_discovered",
+        "worker_health",
+        "latency_sample",
+        "throughput_sample",
+        "checksum_verified",
+        "simulated_layer_transfer",
+        "run_completed",
+    }
     missing_types = sorted(required_types - event_types)
     if missing_types:
         fail(f"events.jsonl: missing required event type(s): {', '.join(missing_types)}")
 
     failure_counts = run["failure_counts"]
-    if failure_counts["failures"] > 0 and "failure_observed" not in event_types:
-        fail("events.jsonl: failure_counts.failures requires failure_observed event")
-    if failure_counts["retries"] > 0 and "retry_scheduled" not in event_types:
-        fail("events.jsonl: failure_counts.retries requires retry_scheduled event")
-    if failure_counts["reconnects"] > 0 and "reconnect_succeeded" not in event_types:
-        fail("events.jsonl: failure_counts.reconnects requires reconnect_succeeded event")
+    checksums = run["checksums"]
+    if failure_counts["failures"] > failure_events:
+        fail("events.jsonl: failure_counts.failures requires matching failure_observed event(s)")
+    if failure_counts["retries"] > retry_events:
+        fail("events.jsonl: failure_counts.retries requires matching retry_scheduled event(s)")
+    if failure_counts["reconnects"] > reconnect_events:
+        fail("events.jsonl: failure_counts.reconnects requires matching reconnect_succeeded event(s)")
+    if failure_counts["timeouts"] > timeout_events:
+        fail("events.jsonl: failure_counts.timeouts requires timeout failure_observed event(s)")
+    if checksums["failed"] > checksum_failure_events:
+        fail("events.jsonl: checksum failures require checksum_verified fail event(s)")
+    if checksums["failed"] == 0 and checksum_failure_events > 0:
+        fail("events.jsonl: checksum_verified fail events require run.json.checksums.failed > 0")
+
+    missing_worker_discovery = sorted({"B", "C"} - node_discovered_nodes)
+    if missing_worker_discovery:
+        fail(f"events.jsonl: missing node_discovered event(s) for worker(s): {', '.join(missing_worker_discovery)}")
+    missing_worker_health = sorted({"B", "C"} - worker_health_nodes)
+    if missing_worker_health:
+        fail(f"events.jsonl: missing worker_health event(s) for worker(s): {', '.join(missing_worker_health)}")
+    missing_latency_pairs = sorted(EXPECTED_WORKER_PAIRS - latency_pairs)
+    if missing_latency_pairs:
+        fail(f"events.jsonl: missing latency_sample event(s) for pair(s): {', '.join(missing_latency_pairs)}")
+    missing_throughput_pairs = sorted(EXPECTED_WORKER_PAIRS - throughput_pairs)
+    if missing_throughput_pairs:
+        fail(f"events.jsonl: missing throughput_sample event(s) for pair(s): {', '.join(missing_throughput_pairs)}")
 
     return events
 
@@ -596,9 +745,23 @@ def parse_rate(value: str, label: str) -> float:
     return parsed
 
 
+def parse_concurrent_links(value: str, label: str) -> set[str]:
+    if value == "none":
+        return set()
+    pairs = {item.strip() for item in value.split(",") if item.strip()}
+    if not pairs:
+        fail(f"{label}: expected none or comma-separated node pairs")
+    invalid = sorted(pair for pair in pairs if not NODE_PAIR_RE.match(pair))
+    if invalid:
+        fail(f"{label}: invalid node pair(s): {', '.join(invalid)}")
+    return pairs
+
+
 def validate_latency_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str, str]]:
     rows = validate_csv(run_dir / "latency.csv", LATENCY_HEADER, run["run_id"], "latency.csv")
     message_sizes = set(run["scenario"]["message_sizes_bytes"])
+    remote_rate_keys = {rate_key(rate) for rate in run["scenario"]["remote_expert_rates"]}
+    observed = set()
     for index, row in enumerate(rows, 2):
         label = f"latency.csv:{index}"
         if row["direction"] not in {"request", "response", "round_trip"}:
@@ -606,6 +769,9 @@ def validate_latency_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str, s
         message_size = parse_int_cell(row["message_size_bytes"], f"{label}.message_size_bytes", 1)
         if message_size not in message_sizes:
             fail(f"{label}.message_size_bytes: not listed in run.json scenario")
+        observed.add((row["node_pair"], message_size))
+        if rate_key(parse_rate(row["remote_expert_rate"], f"{label}.remote_expert_rate")) not in remote_rate_keys:
+            fail(f"{label}.remote_expert_rate: not listed in run.json scenario")
         parse_int_cell(row["sample_count"], f"{label}.sample_count", 1)
         parse_int_cell(row["warmup_count"], f"{label}.warmup_count", 0)
         parse_int_cell(row["transfer_count"], f"{label}.transfer_count", 1)
@@ -622,12 +788,18 @@ def validate_latency_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str, s
             fail(f"{label}: expected min_us <= p50_us <= p95_us <= p99_us <= max_us")
         if abs(jitter - (p99 - p50)) > 0.001:
             fail(f"{label}.jitter_us: expected p99_us - p50_us")
+    missing = expected_grid(EXPECTED_WORKER_PAIRS, message_sizes) - observed
+    if missing:
+        fail(f"latency.csv: missing A/B/C coverage {format_missing_grid(missing)}")
     return rows
 
 
 def validate_throughput_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str, str]]:
     rows = validate_csv(run_dir / "throughput.csv", THROUGHPUT_HEADER, run["run_id"], "throughput.csv")
     block_sizes = set(run["scenario"]["block_sizes_bytes"])
+    remote_rate_keys = {rate_key(rate) for rate in run["scenario"]["remote_expert_rates"]}
+    observed_solo = set()
+    observed_concurrent_pairs = set()
     for index, row in enumerate(rows, 2):
         label = f"throughput.csv:{index}"
         if row["direction"] not in {"send", "receive", "round_trip"}:
@@ -635,6 +807,8 @@ def validate_throughput_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str
         block_size = parse_int_cell(row["block_size_bytes"], f"{label}.block_size_bytes", 1)
         if block_size not in block_sizes:
             fail(f"{label}.block_size_bytes: not listed in run.json scenario")
+        if rate_key(parse_rate(row["remote_expert_rate"], f"{label}.remote_expert_rate")) not in remote_rate_keys:
+            fail(f"{label}.remote_expert_rate: not listed in run.json scenario")
         transfer_count = parse_int_cell(row["transfer_count"], f"{label}.transfer_count", 1)
         bytes_sent = parse_int_cell(row["bytes_sent"], f"{label}.bytes_sent", 1)
         if bytes_sent < block_size * transfer_count:
@@ -645,8 +819,19 @@ def validate_throughput_csv(run_dir: Path, run: dict[str, Any]) -> list[dict[str
         parse_number_cell(row["duration_ms"], f"{label}.duration_ms", 0.000001)
         parse_number_cell(row["mib_per_sec"], f"{label}.mib_per_sec", 0.0)
         parse_number_cell(row["gbps"], f"{label}.gbps", 0.0)
-        if row["concurrent_links"] == "":
-            fail(f"{label}.concurrent_links: expected none or comma-separated node pairs")
+        concurrent_links = parse_concurrent_links(row["concurrent_links"], f"{label}.concurrent_links")
+        if not concurrent_links:
+            observed_solo.add((row["node_pair"], block_size))
+        elif concurrent_links == EXPECTED_WORKER_PAIRS:
+            observed_concurrent_pairs.add(row["node_pair"])
+        else:
+            fail(f"{label}.concurrent_links: expected none or A-B,A-C")
+    missing_solo = expected_grid(EXPECTED_WORKER_PAIRS, block_sizes) - observed_solo
+    if missing_solo:
+        fail(f"throughput.csv: missing solo A/B/C coverage {format_missing_grid(missing_solo)}")
+    missing_concurrent = sorted(EXPECTED_WORKER_PAIRS - observed_concurrent_pairs)
+    if missing_concurrent:
+        fail(f"throughput.csv: missing concurrent A-B/A-C row(s): {', '.join(missing_concurrent)}")
     return rows
 
 
@@ -669,12 +854,17 @@ def validate_summary(run_dir: Path, run: dict[str, Any]) -> None:
         "p95",
         "p99",
         "throughput",
+        "concurrent-link interference",
         "checksum failures:",
         "failures:",
         "retries:",
         "reconnects:",
         "timeouts:",
+        "scheduler overhead",
+        "bytes sent per simulated token",
+        "per-layer simulated transport time",
         "predicted upper-bound tokens/sec",
+        "hardware-interpretable:",
         "data kind:",
     ]
     lower_text = text.lower()

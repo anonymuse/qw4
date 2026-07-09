@@ -171,19 +171,19 @@
           "properties": {
             "layers": {
               "type": "integer",
-              "minimum": 1
+              "const": 94
             },
             "hidden_size": {
               "type": "integer",
-              "minimum": 1
+              "const": 4096
             },
             "top_k": {
               "type": "integer",
-              "minimum": 1
+              "const": 8
             },
             "packets_per_destination_per_layer": {
               "type": "integer",
-              "minimum": 1
+              "const": 1
             },
             "layer_owners": {
               "type": "array",
@@ -394,6 +394,11 @@
             "additionalProperties": false,
             "required": [
               "remote_expert_rate",
+              "local_expert_rate",
+              "bytes_per_simulated_token",
+              "simulated_transport_time_us_per_token",
+              "scheduler_overhead_us_per_token",
+              "formula",
               "tokens_per_sec"
             ],
             "properties": {
@@ -401,6 +406,27 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
+              },
+              "local_expert_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "bytes_per_simulated_token": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "simulated_transport_time_us_per_token": {
+                "type": "number",
+                "minimum": 0
+              },
+              "scheduler_overhead_us_per_token": {
+                "type": "number",
+                "minimum": 0
+              },
+              "formula": {
+                "type": "string",
+                "minLength": 1
               },
               "tokens_per_sec": {
                 "type": "number",

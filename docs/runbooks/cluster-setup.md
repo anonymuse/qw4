@@ -30,6 +30,9 @@ Optional support nodes must not carry core model weights unless a later ADR give
 
 ## Phase 0 Measurements
 
+Use [DS5-F000 Artifact Readiness](ds5-f000-artifact-readiness.md) for the
+prep-only validator checklist and the exact target A/B/C command sequence.
+
 Measure the following before runtime claims:
 
 | Area | Required measurement |

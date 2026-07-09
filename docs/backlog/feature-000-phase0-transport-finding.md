@@ -22,6 +22,10 @@ Existing implementation signals:
 - The Phase 0 routing-payload scaffold validates synthetic Qwen-shaped record shape, B/C target-node bounds, and zero-copy planning assumptions as preparatory schema/test evidence for this feature.
 - The repository defines the first publishable milestone in `docs/minimum-viable-finding.md`.
 - Loopback and local smoke findings are useful scaffolding evidence, not acceptance-hardware proof.
+- Artifact readiness prep is tracked in
+  `docs/runbooks/ds5-f000-artifact-readiness.md`; it tightens schema/report
+  validation but does not replace the required target A/B/C run.
+=======
 - The routing-payload scaffold is not target-hardware transport evidence, measured copy-count telemetry, or DS5-F002 runtime progress.
 
 ## Rigid Acceptance Criteria
@@ -53,4 +57,14 @@ The merge request must attach or reference:
 - Any performance claim that omits p95/p99 latency or scheduler overhead.
 - Any transport result without checksummed artifacts.
 - Any move into fused routing, tokenizer, prefetch, model loading, or Metal kernels before this feature reaches a clear go/no-go.
+
+## Artifact Readiness Gate
+
+Before target-hardware evidence is attached, `tools/report/validate_run.py` must
+pass on every referenced run directory. The validator is expected to reject
+partial artifacts that omit A-B/A-C latency coverage, block-size throughput
+coverage, concurrent-link rows, checksum-failure events, worker health,
+reconnect counters, scheduler overhead, or projected decode-impact formula
+inputs.
+=======
 - Any reading of the routing-payload scaffold or its zero-copy design budget as measured copy-count telemetry.

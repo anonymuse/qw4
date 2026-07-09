@@ -267,7 +267,15 @@ def sensitivity_rows(run: dict[str, Any], limit: int = 24) -> list[list[str]]:
             [
                 value_or_missing(get_path(item, "remote_expert_rate", "remote_rate", "rate")),
                 value_or_missing(get_path(item, "bytes_per_token", "bytes_per_simulated_token")),
-                value_or_missing(get_path(item, "transport_time_ms_per_token", "simulated_transport_time_ms")),
+                value_or_missing(
+                    get_path(
+                        item,
+                        "transport_time_ms_per_token",
+                        "simulated_transport_time_ms",
+                        "transport_time_us_per_token",
+                        "simulated_transport_time_us_per_token",
+                    )
+                ),
                 value_or_missing(
                     get_path(
                         item,
