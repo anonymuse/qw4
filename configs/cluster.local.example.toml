@@ -1,0 +1,87 @@
+# DS5 Phase 0 real-cluster template.
+# Copy this file to a local, untracked config before replacing hostnames.
+
+schema_version = 1
+config_name = "cluster.local.example"
+config_kind = "real_cluster_template"
+description = "Template for the three-node DS5 Phase 0 transport cluster. It contains no private IPs or secrets."
+
+[interpretation]
+scope = "real_cluster_template"
+synthetic = false
+loopback = false
+real_cluster = true
+requires_user_network_config = true
+may_interpret_results_as_real_hardware_data = true
+results_warning = "Real-hardware interpretation is valid only after replacing placeholder hostnames and recording the confirmed network path."
+
+[cluster]
+id = "ds5-local-template"
+coordinator_node = "A"
+worker_nodes = ["B", "C"]
+required_worker_count = 2
+distinct_physical_hosts_required = true
+intended_link = "Thunderbolt Bridge or another user-confirmed direct local link"
+network_path_must_be_recorded = true
+wifi_fallback_allowed = false
+static_weight_cap_gb_per_48gb_node = 33.6
+runtime_reserve_gb_per_48gb_node = 14.4
+aggregate_static_weight_cap_gb = 100.8
+refuse_static_cap_overrun_without_override = true
+
+[transport]
+protocol = "tcp"
+bind_host = "0.0.0.0"
+connect_timeout_ms = 2000
+read_timeout_ms = 10000
+heartbeat_interval_ms = 1000
+heartbeat_timeout_ms = 5000
+reconnect_attempts = 1
+checksum_required = true
+preferred_checksum_mode = "sha256"
+copy_measurement_required = true
+
+[artifacts]
+default_root = "artifacts/runs"
+record_git_commit = true
+record_hostnames = true
+record_macos_version = true
+record_power_mode = true
+record_confirmed_network_path = true
+
+[[nodes]]
+id = "A"
+role = "coordinator"
+hardware = "MacBook Pro M5 Pro"
+memory_gb = 48
+host = "node-a.local.example"
+listen_address = "0.0.0.0:7554"
+connect_address = "node-a.local.example:7554"
+expected_runtime = "coordinator"
+core_model_weights_allowed = false
+
+[[nodes]]
+id = "B"
+role = "worker"
+hardware = "MacBook Pro M5 Max"
+memory_gb = 48
+host = "node-b.local.example"
+listen_address = "0.0.0.0:7555"
+connect_address = "node-b.local.example:7555"
+expected_runtime = "worker"
+core_model_weights_allowed = true
+static_weight_cap_gb = 33.6
+runtime_reserve_gb = 14.4
+
+[[nodes]]
+id = "C"
+role = "worker"
+hardware = "MacBook Pro M5 Max"
+memory_gb = 48
+host = "node-c.local.example"
+listen_address = "0.0.0.0:7556"
+connect_address = "node-c.local.example:7556"
+expected_runtime = "worker"
+core_model_weights_allowed = true
+static_weight_cap_gb = 33.6
+runtime_reserve_gb = 14.4

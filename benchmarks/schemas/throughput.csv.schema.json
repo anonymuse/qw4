@@ -1,0 +1,112 @@
+{
+  "$schema": "https://ds5.local/benchmarks/schemas/csv-field-spec-v1",
+  "schema_version": "phase0.artifacts.v1",
+  "artifact": "throughput.csv",
+  "format": {
+    "encoding": "utf-8",
+    "delimiter": ",",
+    "header": true
+  },
+  "primary_key": [
+    "run_id",
+    "node_pair",
+    "direction",
+    "block_size_bytes",
+    "remote_expert_rate",
+    "scenario_step"
+  ],
+  "columns": [
+    {
+      "name": "schema_version",
+      "type": "string",
+      "required": true,
+      "allowed_values": [
+        "phase0.artifacts.v1"
+      ]
+    },
+    {
+      "name": "run_id",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "node_pair",
+      "type": "node_pair",
+      "required": true
+    },
+    {
+      "name": "direction",
+      "type": "enum",
+      "required": true,
+      "allowed_values": [
+        "send",
+        "receive",
+        "round_trip"
+      ]
+    },
+    {
+      "name": "block_size_bytes",
+      "type": "integer",
+      "minimum": 1,
+      "required": true
+    },
+    {
+      "name": "transfer_count",
+      "type": "integer",
+      "minimum": 1,
+      "required": true
+    },
+    {
+      "name": "bytes_sent",
+      "type": "integer",
+      "minimum": 1,
+      "required": true
+    },
+    {
+      "name": "checksum_algorithm",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "checksum_failures",
+      "type": "integer",
+      "minimum": 0,
+      "required": true
+    },
+    {
+      "name": "duration_ms",
+      "type": "number",
+      "exclusive_minimum": 0,
+      "required": true
+    },
+    {
+      "name": "mib_per_sec",
+      "type": "number",
+      "minimum": 0,
+      "required": true
+    },
+    {
+      "name": "gbps",
+      "type": "number",
+      "minimum": 0,
+      "required": true
+    },
+    {
+      "name": "concurrent_links",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "remote_expert_rate",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "required": true
+    },
+    {
+      "name": "scenario_step",
+      "type": "string",
+      "required": true
+    }
+  ]
+}

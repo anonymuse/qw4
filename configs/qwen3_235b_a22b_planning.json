@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3-235B-A22B",
+    "variant": "Qwen3-235B-A22B-Instruct-2507",
+    "total_parameters": 235000000000,
+    "activated_parameters": 22000000000,
+    "layers": 94,
+    "hidden_size": 4096,
+    "attention_heads": 64,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "experts": 128,
+    "active_experts": 8
+  },
+  "nodes": [
+    {
+      "name": "A",
+      "role": "coordinator / static-owner planning",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_reserve_gb": 14.4,
+      "static_fraction": 0.333333333333,
+      "kv_fraction": 0.0
+    },
+    {
+      "name": "B",
+      "role": "primary worker",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_reserve_gb": 14.4,
+      "static_fraction": 0.333333333333,
+      "kv_fraction": 0.5
+    },
+    {
+      "name": "C",
+      "role": "primary worker",
+      "memory_gb": 48.0,
+      "static_cap_gb": 33.6,
+      "runtime_reserve_gb": 14.4,
+      "static_fraction": 0.333333333334,
+      "kv_fraction": 0.5
+    }
+  ],
+  "quantization": {
+    "classes": {
+      "fp16": {
+        "bits_per_parameter": 16.0,
+        "block_size": null,
+        "metadata_bytes_per_block": 0.0,
+        "description": "Planning class for router/gate tensors that must not be aggressively quantized without evidence."
+      },
+      "q8_planning": {
+        "bits_per_parameter": 8.0,
+        "block_size": 32,
+        "metadata_bytes_per_block": 2.0,
+        "description": "Planning Q8 class with one FP16-like scale per 32 weights."
+      },
+      "iq2_planning": {
+        "bits_per_parameter": 2.0,
+        "block_size": 256,
+        "metadata_bytes_per_block": 16.0,
+        "description": "Aggressive low-bit expert-only planning class; quality is unresolved."
+      }
+    }
+  },
+  "static_weight_groups": [
+    {
+      "name": "router_gate_mirrors",
+      "param_source": "router_gate",
+      "quant_class": "fp16",
+      "placement": {
+        "type": "replicated",
+        "nodes": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "notes": "Router/gate mirrors are replicated for correctness and future B/C local-router validation."
+    },
+    {
+      "name": "non_expert_dense_minus_router",
+      "param_source": "derived_dense_minus_router_gate",
+      "quant_class": "q8_planning",
+      "placement": {
+        "type": "fractional_by_node_static_fraction"
+      },
+      "notes": "Planning bucket for attention, embeddings/lm_head if present, norms, and other non-expert tensors."
+    },
+    {
+      "name": "moe_experts",
+      "param_source": "derived_expert",
+      "quant_class": "iq2_planning",
+      "placement": {
+        "type": "fractional_by_node_static_fraction"
+      },
+      "notes": "Expert tensor bucket derived from total versus activated parameter counts and top-8/128 routing."
+    }
+  ],
+  "overheads": {
+    "static_safety_margin_fraction": 0.08,
+    "per_group_alignment_bytes": 1048576
+  },
+  "kv_cache": {
+    "dtype": "fp16",
+    "bytes_per_element": 2,
+    "batch_size": 1,
+    "context_lengths": [
+      8192,
+      32768,
+      65536,
+      131072,
+      262144
+    ]
+  },
+  "unresolved_assumptions": [
+    "Three-node static placement is a planning scenario; if Node A remains control-only, B/C static fractions must be rerun and may fail the cap.",
+    "The dense/shared versus expert split is algebraically inferred from 235B total, 22B activated, and 8-of-128 experts rather than real tensor metadata.",
+    "The iq2_planning class is a feasibility placeholder, not an accepted quantization recipe."
+  ]
+}
+

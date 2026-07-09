@@ -1,0 +1,235 @@
+{
+  "schema_version": "phase0.artifacts.v1",
+  "run_id": "transport-smoke",
+  "git_commit": "cb71e857564818e292967c1b94eac13979f335a1",
+  "software": {
+    "name": "ds5-phase0-fixture",
+    "version": "0.0.0-fixture"
+  },
+  "started_at": "2026-07-09T03:00:00Z",
+  "ended_at": "2026-07-09T03:00:05Z",
+  "duration_ms": 5000,
+  "valid": true,
+  "environment": {
+    "network_path": "synthetic-loopback",
+    "clock_sync": "single-process fixture clock",
+    "hardware_interpretable": false
+  },
+  "scenario": {
+    "name": "qwen3_moe_transport_smoke",
+    "config_path": "tests/fixtures/scenarios/transport-smoke-scenario.json",
+    "kind": "synthetic",
+    "message_sizes_bytes": [
+      4096,
+      16384,
+      65536,
+      1048576
+    ],
+    "block_sizes_bytes": [
+      1048576,
+      4194304
+    ],
+    "transfer_count": 40,
+    "warmup_count": 4,
+    "checksum_mode": "sha256",
+    "remote_expert_rates": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "qwen_shape": {
+      "layers": 94,
+      "hidden_size": 4096,
+      "top_k": 8,
+      "packets_per_destination_per_layer": 1,
+      "layer_owners": [
+        {
+          "node_id": "B",
+          "start_layer": 0,
+          "end_layer": 46
+        },
+        {
+          "node_id": "C",
+          "start_layer": 47,
+          "end_layer": 93
+        }
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "node_id": "A",
+      "role": "coordinator",
+      "hostname": "fixture-a",
+      "hardware_label": "M5 Pro 48GB UMA fixture",
+      "listen_addr": "127.0.0.1:7554",
+      "transport": "loopback"
+    },
+    {
+      "node_id": "B",
+      "role": "worker",
+      "hostname": "fixture-b",
+      "hardware_label": "M5 Max 48GB UMA fixture",
+      "listen_addr": "127.0.0.1:7555",
+      "transport": "loopback"
+    },
+    {
+      "node_id": "C",
+      "role": "worker",
+      "hostname": "fixture-c",
+      "hardware_label": "M5 Max 48GB UMA fixture",
+      "listen_addr": "127.0.0.1:7556",
+      "transport": "loopback"
+    }
+  ],
+  "checksums": {
+    "algorithm": "sha256",
+    "total_transfers": 80,
+    "passed": 80,
+    "failed": 0,
+    "status": "pass"
+  },
+  "failure_counts": {
+    "failures": 1,
+    "retries": 1,
+    "reconnects": 1,
+    "timeouts": 0
+  },
+  "metrics": {
+    "latency_by_message_size": [
+      {
+        "node_pair": "A-B",
+        "message_size_bytes": 4096,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 240.0,
+        "p95_us": 310.0,
+        "p99_us": 355.0
+      },
+      {
+        "node_pair": "A-C",
+        "message_size_bytes": 4096,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 245.0,
+        "p95_us": 318.0,
+        "p99_us": 366.0
+      },
+      {
+        "node_pair": "A-B",
+        "message_size_bytes": 1048576,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 2150.0,
+        "p95_us": 2480.0,
+        "p99_us": 2710.0
+      },
+      {
+        "node_pair": "A-C",
+        "message_size_bytes": 1048576,
+        "sample_count": 36,
+        "checksum_failures": 0,
+        "p50_us": 2190.0,
+        "p95_us": 2525.0,
+        "p99_us": 2765.0
+      }
+    ],
+    "throughput_by_block_size": [
+      {
+        "node_pair": "A-B",
+        "block_size_bytes": 1048576,
+        "transfer_count": 40,
+        "bytes_sent": 41943040,
+        "checksum_failures": 0,
+        "duration_ms": 84.0,
+        "mib_per_sec": 476.19,
+        "gbps": 3.99
+      },
+      {
+        "node_pair": "A-C",
+        "block_size_bytes": 1048576,
+        "transfer_count": 40,
+        "bytes_sent": 41943040,
+        "checksum_failures": 0,
+        "duration_ms": 87.0,
+        "mib_per_sec": 459.77,
+        "gbps": 3.86
+      },
+      {
+        "node_pair": "A-B",
+        "block_size_bytes": 4194304,
+        "transfer_count": 40,
+        "bytes_sent": 167772160,
+        "checksum_failures": 0,
+        "duration_ms": 290.0,
+        "mib_per_sec": 551.72,
+        "gbps": 4.63
+      },
+      {
+        "node_pair": "A-C",
+        "block_size_bytes": 4194304,
+        "transfer_count": 40,
+        "bytes_sent": 167772160,
+        "checksum_failures": 0,
+        "duration_ms": 302.0,
+        "mib_per_sec": 529.8,
+        "gbps": 4.44
+      }
+    ],
+    "scheduler_overhead_us_per_token": {
+      "p50": 38.0,
+      "p95": 55.0,
+      "p99": 72.0
+    },
+    "bytes_sent_per_simulated_token": 25165824,
+    "per_layer_transport_time_us": {
+      "p50": 2100.0,
+      "p95": 2480.0,
+      "p99": 2765.0
+    },
+    "concurrent_link_interference": [
+      {
+        "node_pair": "A-B",
+        "solo_mib_per_sec": 551.72,
+        "concurrent_mib_per_sec": 510.0,
+        "degradation_pct": 7.56
+      },
+      {
+        "node_pair": "A-C",
+        "solo_mib_per_sec": 529.8,
+        "concurrent_mib_per_sec": 498.0,
+        "degradation_pct": 6.0
+      }
+    ],
+    "predicted_upper_bound_tokens_per_sec": [
+      {
+        "remote_expert_rate": 0.0,
+        "tokens_per_sec": 24.0
+      },
+      {
+        "remote_expert_rate": 0.25,
+        "tokens_per_sec": 16.5
+      },
+      {
+        "remote_expert_rate": 0.5,
+        "tokens_per_sec": 11.2
+      },
+      {
+        "remote_expert_rate": 0.75,
+        "tokens_per_sec": 8.1
+      },
+      {
+        "remote_expert_rate": 1.0,
+        "tokens_per_sec": 6.0
+      }
+    ]
+  },
+  "artifacts": {
+    "events": "events.jsonl",
+    "latency": "latency.csv",
+    "throughput": "throughput.csv",
+    "summary": "summary.md"
+  }
+}
