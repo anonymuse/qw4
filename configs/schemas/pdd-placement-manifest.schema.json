@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ds5.local/configs/schemas/pdd-placement-manifest.schema.json",
+  "title": "DS5 Phase 1 PDD placement manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "feature_id",
+    "model",
+    "limits",
+    "nodes",
+    "artifact_policy",
+    "limits_of_claim"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "const": "ds5.pdd_placement.v1"
+    },
+    "feature_id": {
+      "const": "DS5-F001"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "variant",
+        "layers",
+        "experts",
+        "active_experts"
+      ],
+      "properties": {
+        "name": {
+          "const": "Qwen3-235B-A22B"
+        },
+        "variant": {
+          "const": "Qwen3-235B-A22B-Instruct-2507"
+        },
+        "layers": {
+          "const": 94
+        },
+        "experts": {
+          "const": 128
+        },
+        "active_experts": {
+          "const": 8
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "byte_unit",
+        "worker_memory_gb",
+        "static_cap_fraction",
+        "runtime_headroom_fraction",
+        "static_cap_gb",
+        "runtime_headroom_gb"
+      ],
+      "properties": {
+        "byte_unit": {
+          "const": "decimal_gb"
+        },
+        "worker_memory_gb": {
+          "const": 48.0
+        },
+        "static_cap_fraction": {
+          "const": 0.7
+        },
+        "runtime_headroom_fraction": {
+          "const": 0.3
+        },
+        "static_cap_gb": {
+          "const": 33.6
+        },
+        "runtime_headroom_gb": {
+          "const": 14.4
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "role",
+          "memory_gb",
+          "static_cap_gb",
+          "runtime_headroom_gb",
+          "owns_primary_moe_decode",
+          "decode_layer_ranges",
+          "static_memory",
+          "notes"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "memory_gb": {
+            "const": 48.0
+          },
+          "static_cap_gb": {
+            "const": 33.6
+          },
+          "runtime_headroom_gb": {
+            "const": 14.4
+          },
+          "owns_primary_moe_decode": {
+            "type": "boolean"
+          },
+          "decode_layer_ranges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 93
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 93
+                }
+              }
+            }
+          },
+          "static_memory": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "primary_moe_decode_bytes",
+              "dense_decode_bytes",
+              "router_gate_mirror_bytes",
+              "other_static_bytes",
+              "total_static_bytes"
+            ],
+            "properties": {
+              "primary_moe_decode_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dense_decode_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "router_gate_mirror_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "other_static_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_static_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "artifact_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_ledger_schema_version",
+        "default_ledger_path"
+      ],
+      "properties": {
+        "memory_ledger_schema_version": {
+          "const": "ds5.pdd_memory_ledger.v1"
+        },
+        "default_ledger_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "limits_of_claim": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
