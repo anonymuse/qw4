@@ -48,11 +48,11 @@
     "hot_path_heap_to_heap_copy_budget": 0,
     "buffer_ownership": [
       "Coordinator A owns the immutable routing payload until all targeted workers acknowledge receipt.",
-      "Workers B and C consume routing payload views without claiming ownership of coordinator memory.",
+      "Workers B and C are expected to consume routing payload views without claiming ownership of coordinator memory in a future runtime path.",
       "Future transport telemetry must count staging, frame, checksum, and worker-ingress copies before any zero-copy claim."
     ],
     "requires_future_validation": [
-      "copy-count telemetry in the transport hot path",
+      "measured copy-count telemetry in the transport hot path",
       "checksum behavior for Phase 0 routing-payload bytes",
       "per-block synchronization timing on non-loopback A/B/C hardware",
       "replay and out-of-order rejection in the runtime packet decoder"
@@ -181,6 +181,7 @@
     "It does not load Qwen weights or tokenizer assets.",
     "It does not implement a fused runtime packet decoder, Metal kernels, a KV allocator, or a primary-weight loader.",
     "It does not provide copy-count telemetry or benchmark evidence for a zero-copy transport path.",
+    "The hot-path heap-to-heap copy budget is an unvalidated future design target, not measured copy-count telemetry.",
     "It preserves Qwen top-8 routing semantics and does not substitute topology-aware expert choices.",
     "It does not unblock DS5-F002; DS5-F002 remains blocked until DS5-F001A and DS5-F000 are complete."
   ]

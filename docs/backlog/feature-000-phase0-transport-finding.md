@@ -1,6 +1,6 @@
 # Feature DS5-F000: Phase 0 Transport Finding
 
-Status: queued after `DS5-F001A`; Phase 0 scaffolding exists, target-hardware finding not complete.
+Status: next target-hardware finding after `DS5-F001A` completion in PR #19; Phase 0 scaffolding exists, target-hardware finding not complete.
 
 Epic: `DS5-E02: Routing Transport`
 
@@ -19,8 +19,10 @@ This feature uses simulated MoE traffic. It does not load Qwen weights, run toke
 Existing implementation signals:
 
 - Transport scaffolding and benchmark artifact schemas exist.
+- The Phase 0 routing-payload scaffold validates synthetic Qwen-shaped record shape, B/C target-node bounds, and zero-copy planning assumptions as preparatory schema/test evidence for this feature.
 - The repository defines the first publishable milestone in `docs/minimum-viable-finding.md`.
 - Loopback and local smoke findings are useful scaffolding evidence, not acceptance-hardware proof.
+- The routing-payload scaffold is not target-hardware transport evidence, measured copy-count telemetry, or DS5-F002 runtime progress.
 
 ## Rigid Acceptance Criteria
 
@@ -43,6 +45,7 @@ The merge request must attach or reference:
 - human-readable finding summary;
 - hardware and network topology notes;
 - validation output for artifact schema checks.
+- routing-payload scaffold validation only as preparatory schema/test evidence, if referenced.
 
 ## Merge Blockers
 
@@ -50,3 +53,4 @@ The merge request must attach or reference:
 - Any performance claim that omits p95/p99 latency or scheduler overhead.
 - Any transport result without checksummed artifacts.
 - Any move into fused routing, tokenizer, prefetch, model loading, or Metal kernels before this feature reaches a clear go/no-go.
+- Any reading of the routing-payload scaffold or its zero-copy design budget as measured copy-count telemetry.

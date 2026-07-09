@@ -174,6 +174,16 @@ class RoutingPlanTests(unittest.TestCase):
         ):
             validate_manifest(manifest)
 
+    def test_zero_copy_copy_budget_must_remain_unmeasured_design_target(self) -> None:
+        manifest = self.load_fixture()
+        manifest["zero_copy_assumptions"]["hot_path_heap_to_heap_copy_budget"] = 1
+
+        with self.assertRaisesRegex(
+            RoutingPlanValidationError,
+            "zero_copy_assumptions.hot_path_heap_to_heap_copy_budget must be 0",
+        ):
+            validate_manifest(manifest)
+
 
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
