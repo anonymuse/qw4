@@ -53,5 +53,15 @@ ledger with:
 ```bash
 python3 tools/model_inspect/validate_pdd_topology.py \
   --manifest configs/qwen3_pdd_topology_phase1.json \
-  --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json
+  --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json \
+  --summary-out docs/findings/ds5-f001-pdd-topology-acceptance.md
 ```
+
+The shorter coordinator path is:
+
+```bash
+make pdd-topology-validate
+```
+
+This is scaffold/planning evidence only. It validates manifest constants and byte
+arithmetic; it does not load model weights or claim full runtime support.

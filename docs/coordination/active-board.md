@@ -38,7 +38,7 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/83f9/qw4`.
 | B | unassigned | merged seed | PR #5 and later integration branches | `benchmarks/schemas/`, `tests/fixtures/` | `python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke` | `docs/work-packs/2026-07-09-overnight/agent-b-benchmark-schemas.md` |
 | C | unassigned | merged seed | PR #3, PR #4, and PR #5 | `src/transport/`, transport smoke command | loopback transport smoke command | `docs/work-packs/2026-07-09-overnight/agent-c-loopback-transport.md` |
 | D | unassigned | merged seed | PR #2 and later integration branches | `configs/`, `benchmarks/scenarios/` | scenario parser or smoke run | `docs/work-packs/2026-07-09-overnight/agent-d-configs-scenarios.md` |
-| E | unassigned | active backlog | `codex/ds5-f001-pdd-topology` / DS5-F001 | `src/model/`, `tools/model_inspect/`, `tools/quant/` | memory estimator tests or fixture run | `docs/work-packs/2026-07-09-overnight/agent-e-placement-feasibility.md` |
+| E / DS5-F001 | Codex | validation passed; ready for review | `codex/ds5-f001-pdd-artifacts` / `/Users/jessewhite/.codex/worktrees/b5b8/qw4` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/` | `make pdd-topology-validate`; `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.model.test_pdd_topology`; `make test` all passed | final handoff from this branch |
 | F | unassigned | merged seed | PR #2 and later integration branches | `tools/report/`, `publication/`, `docs/findings/` | report generation from fixture artifacts | `docs/work-packs/2026-07-09-overnight/agent-f-reporting-publication.md` |
 
 ## Worktree Census

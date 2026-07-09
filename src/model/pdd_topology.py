@@ -16,6 +16,7 @@ BYTES_PER_GB = 1_000_000_000
 PLACEMENT_SCHEMA_VERSION = "ds5.pdd_placement.v1"
 MEMORY_LEDGER_SCHEMA_VERSION = "ds5.pdd_memory_ledger.v1"
 FEATURE_ID = "DS5-F001"
+EVIDENCE_CLASS = "scaffold/planning"
 EXPECTED_MODEL_LAYERS = 94
 EXPECTED_NODES = ("A", "B", "C")
 EXPECTED_LAYER_RANGES = {
@@ -68,6 +69,8 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
         MEMORY_LEDGER_SCHEMA_VERSION,
         "artifact_policy.memory_ledger_schema_version",
     )
+    default_ledger_path = _required_string(artifact_policy, "default_ledger_path", "artifact_policy")
+    default_summary_path = _required_string(artifact_policy, "default_summary_path", "artifact_policy")
 
     nodes = _required_list(manifest, "nodes", "root")
     nodes_by_name = _index_nodes(nodes)
@@ -93,6 +96,24 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
             "static_cap_bytes": _gb_to_bytes(EXPECTED_STATIC_CAP_GB),
             "runtime_headroom_bytes": _gb_to_bytes(EXPECTED_RUNTIME_HEADROOM_GB),
         },
+        "artifact_policy": {
+            "default_ledger_path": default_ledger_path,
+            "default_summary_path": default_summary_path,
+        },
+        "evidence": {
+            "class": EVIDENCE_CLASS,
+            "measured_full_runtime": False,
+            "source": "placement manifest constants and validator arithmetic",
+            "not_measured": [
+                "Qwen model weights",
+                "tokenizer assets",
+                "speculative drafter",
+                "primary-weight loader",
+                "KV allocator",
+                "Metal kernels",
+                "startup, warmup, or decode runtime memory",
+            ],
+        },
         "nodes": ledger_nodes,
         "validation": {
             "status": "pass",
@@ -103,6 +124,13 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
                 "Node C owns inclusive decode layers 47-93",
                 "48GB workers keep 30% memory headroom",
                 "48GB workers stay at or below a 33.6GB static cap",
+            ],
+            "checked_claims": [
+                _claim("Node A primary MoE decode bytes are exactly 0"),
+                _claim("Node B owns inclusive decode layers 0-46"),
+                _claim("Node C owns inclusive decode layers 47-93"),
+                _claim("Node B stays under the 33.6GB static cap and preserves 14.4GB runtime headroom"),
+                _claim("Node C stays under the 33.6GB static cap and preserves 14.4GB runtime headroom"),
             ],
         },
         "limits_of_claim": list(manifest.get("limits_of_claim", [])),
@@ -115,21 +143,30 @@ def write_memory_ledger(ledger: dict[str, Any], path: str | Path) -> None:
     out_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def write_finding_summary(ledger: dict[str, Any], path: str | Path) -> None:
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(format_finding_summary(ledger), encoding="utf-8")
+
+
 def format_ledger_summary(ledger: dict[str, Any]) -> str:
     lines = [
         f"{FEATURE_ID} PDD topology manifest: PASS",
+        f"Evidence: {ledger['evidence']['class']} (measured full runtime: no)",
         "",
-        "Node  Layers    Primary MoE decode  Static total  Static cap  Result",
+        "Node  Layers    Primary MoE decode  Static total  Static cap  Static margin  Runtime headroom  Result",
     ]
     for node in ledger["nodes"]:
         layers = _format_layer_ranges(node["decode_layer_ranges"])
-        result = "PASS" if node["passes_static_cap"] else "FAIL"
+        result = "PASS" if node["passes_static_cap"] and node["passes_runtime_headroom"] else "FAIL"
         lines.append(
             f"{node['name']:<5} "
             f"{layers:<9} "
             f"{_fmt_gb(node['primary_moe_decode_bytes']):>18} "
             f"{_fmt_gb(node['total_static_bytes']):>13} "
             f"{_fmt_gb(node['static_cap_bytes']):>11} "
+            f"{_fmt_gb(node['static_headroom_bytes']):>14} "
+            f"{_fmt_gb(node['runtime_headroom_bytes']):>17} "
             f"{result}"
         )
     lines.extend(
@@ -139,6 +176,104 @@ def format_ledger_summary(ledger: dict[str, Any]) -> str:
             "It does not load Qwen weights, tokenizers, speculative drafters, or Metal kernels.",
         ]
     )
+    return "\n".join(lines)
+
+
+def format_finding_summary(ledger: dict[str, Any]) -> str:
+    nodes = {node["name"]: node for node in ledger["nodes"]}
+    lines = [
+        "# DS5-F001 PDD Topology Acceptance Summary",
+        "",
+        "Status: pass as scaffold/planning evidence. This is not measured full-runtime evidence.",
+        "",
+        "## Reproduction",
+        "",
+        "```bash",
+        "make pdd-topology-validate",
+        "```",
+        "",
+        "The command emits:",
+        "",
+        f"- `{ledger['artifact_policy']['default_ledger_path']}`",
+        f"- `{ledger['artifact_policy']['default_summary_path']}`",
+        "",
+        "## Evidence Classification",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+        f"| Evidence class | `{ledger['evidence']['class']}` |",
+        f"| Measured full runtime | `{str(ledger['evidence']['measured_full_runtime']).lower()}` |",
+        f"| Evidence source | {ledger['evidence']['source']} |",
+        "",
+        "This summary validates placement-manifest constants and memory-budget arithmetic only. It does not "
+        "load Qwen weights, tokenizer assets, a speculative drafter, a primary-weight loader, a KV allocator, "
+        "or Metal kernels.",
+        "",
+        "## Acceptance Checks",
+        "",
+        "| Claim | Ledger evidence | Result | Evidence class |",
+        "|---|---|---:|---|",
+        (
+            "| Node A primary MoE decode bytes are exactly 0 "
+            f"| `nodes.A.primary_moe_decode_bytes = {nodes['A']['primary_moe_decode_bytes']}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        (
+            "| Node B owns layers 0-46 "
+            f"| `nodes.B.decode_layer_ranges = {_format_layer_ranges(nodes['B']['decode_layer_ranges'])}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        (
+            "| Node C owns layers 47-93 "
+            f"| `nodes.C.decode_layer_ranges = {_format_layer_ranges(nodes['C']['decode_layer_ranges'])}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        (
+            "| Node B stays under 33.6GB static cap and preserves 14.4GB runtime headroom "
+            f"| `{_fmt_gb(nodes['B']['total_static_bytes'])} <= {_fmt_gb(nodes['B']['static_cap_bytes'])}`; "
+            f"`runtime_headroom = {_fmt_gb(nodes['B']['runtime_headroom_bytes'])}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        (
+            "| Node C stays under 33.6GB static cap and preserves 14.4GB runtime headroom "
+            f"| `{_fmt_gb(nodes['C']['total_static_bytes'])} <= {_fmt_gb(nodes['C']['static_cap_bytes'])}`; "
+            f"`runtime_headroom = {_fmt_gb(nodes['C']['runtime_headroom_bytes'])}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        "",
+        "## Memory Ledger Summary",
+        "",
+        "| Node | Decode layers | Primary MoE decode bytes | Static total | Static cap | Static margin | Runtime headroom | Evidence class |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
+    ]
+
+    for node in ledger["nodes"]:
+        lines.append(
+            f"| {node['name']} "
+            f"| {_format_layer_ranges(node['decode_layer_ranges'])} "
+            f"| {node['primary_moe_decode_bytes']} "
+            f"| {_fmt_gb(node['total_static_bytes'])} "
+            f"| {_fmt_gb(node['static_cap_bytes'])} "
+            f"| {_fmt_gb(node['static_headroom_bytes'])} "
+            f"| {_fmt_gb(node['runtime_headroom_bytes'])} "
+            f"| `{node['evidence_class']}` |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Limits Of Claim",
+            "",
+        ]
+    )
+    for limit in ledger["limits_of_claim"]:
+        lines.append(f"- {limit}")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -238,7 +373,8 @@ def _validate_node(node: dict[str, Any]) -> dict[str, Any]:
     static_cap_bytes = _gb_to_bytes(static_cap_gb)
     runtime_headroom_bytes = _gb_to_bytes(runtime_headroom_gb)
     expected_headroom_bytes = math.ceil(memory_bytes * EXPECTED_RUNTIME_HEADROOM_FRACTION)
-    if runtime_headroom_bytes < expected_headroom_bytes:
+    passes_runtime_headroom = runtime_headroom_bytes >= expected_headroom_bytes
+    if not passes_runtime_headroom:
         raise PlacementValidationError(
             f"node {name}: runtime headroom must be at least 30% of memory "
             f"({expected_headroom_bytes} bytes)"
@@ -259,6 +395,7 @@ def _validate_node(node: dict[str, Any]) -> dict[str, Any]:
         "memory_bytes": memory_bytes,
         "static_cap_bytes": static_cap_bytes,
         "runtime_headroom_bytes": runtime_headroom_bytes,
+        "runtime_headroom_required_bytes": expected_headroom_bytes,
         "decode_layer_ranges": [{"start": start, "end": end} for start, end in ranges],
         "owns_primary_moe_decode": owns_primary,
         "primary_moe_decode_bytes": primary_moe_decode_bytes,
@@ -268,6 +405,9 @@ def _validate_node(node: dict[str, Any]) -> dict[str, Any]:
         "total_static_bytes": total_static_bytes,
         "static_headroom_bytes": static_cap_bytes - total_static_bytes,
         "passes_static_cap": total_static_bytes <= static_cap_bytes,
+        "passes_runtime_headroom": passes_runtime_headroom,
+        "evidence_class": EVIDENCE_CLASS,
+        "measured_full_runtime": False,
         "notes": list(node.get("notes", [])),
     }
 
@@ -330,6 +470,13 @@ def _required_number(data: dict[str, Any], key: str, parent: str) -> int | float
     return value
 
 
+def _required_string(data: dict[str, Any], key: str, parent: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value:
+        raise PlacementValidationError(f"{parent}: missing string {key!r}")
+    return value
+
+
 def _required_nonnegative_int(data: dict[str, Any], key: str, parent: str) -> int:
     value = data.get(key)
     if not isinstance(value, int) or value < 0:
@@ -374,3 +521,11 @@ def _format_layer_ranges_from_tuples(ranges: list[tuple[int, int]]) -> str:
     if not ranges:
         return "none"
     return ",".join(f"{start}-{end}" for start, end in ranges)
+
+
+def _claim(description: str) -> dict[str, Any]:
+    return {
+        "description": description,
+        "evidence_class": EVIDENCE_CLASS,
+        "measured_full_runtime": False,
+    }

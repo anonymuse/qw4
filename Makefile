@@ -38,7 +38,7 @@ memory-sweep:
 	python3 tools/quant/estimate_qwen3_memory.py --config configs/qwen3_235b_a22b_planning.json --mode bc-worker-only --sweep-expert-bits 2,3,4,6,8
 
 pdd-topology-validate:
-	python3 tools/model_inspect/validate_pdd_topology.py --manifest configs/qwen3_pdd_topology_phase1.json --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json
+	python3 tools/model_inspect/validate_pdd_topology.py --manifest configs/qwen3_pdd_topology_phase1.json --ledger-out artifacts/pdd/ds5-f001-memory-ledger.json --summary-out docs/findings/ds5-f001-pdd-topology-acceptance.md
 
 summarize-report:
 	python3 tools/report/summarize_phase0.py $(RUN_DIR)
