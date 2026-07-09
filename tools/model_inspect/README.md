@@ -65,3 +65,26 @@ make pdd-topology-validate
 
 This is scaffold/planning evidence only. It validates manifest constants and byte
 arithmetic; it does not load model weights or claim full runtime support.
+
+## Phase 0 Routing Payload Scaffold
+
+Validate the DS5-F000 Phase 0 routing-payload scaffold and emit a
+machine-readable routing artifact with:
+
+```bash
+make phase0-routing-payload-validate
+```
+
+Equivalent direct command:
+
+```bash
+python3 tools/model_inspect/validate_phase0_routing_payload.py \
+  --manifest configs/qwen3_phase0_routing_payload.json \
+  --artifact-out artifacts/routing/phase0-routing-payload.json \
+  --summary-out docs/findings/phase0-routing-payload-scaffold.md
+```
+
+This validates the exact top-8 routing record field shape, B/C target-node
+bounds, block ordering, and zero-copy assumptions as planning data only. It does
+not load weights, implement a production routing packet runtime, measure copy
+counts, make transport benchmark claims, or unblock DS5-F002.
