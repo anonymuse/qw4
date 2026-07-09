@@ -17,13 +17,14 @@ from model.pdd_topology import (  # noqa: E402
     format_ledger_summary,
     load_manifest,
     validate_manifest,
+    write_finding_summary,
     write_memory_ledger,
 )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate DS5-F001 PDD topology scaffolding and optionally emit a memory ledger."
+        description="Validate DS5-F001 PDD topology scaffolding and optionally emit acceptance artifacts."
     )
     parser.add_argument(
         "--manifest",
@@ -31,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the PDD placement manifest.",
     )
     parser.add_argument("--ledger-out", help="Optional path for the machine-readable memory ledger JSON.")
+    parser.add_argument("--summary-out", help="Optional path for the human-readable finding summary Markdown.")
     parser.add_argument("--json", action="store_true", help="Print the memory ledger JSON to stdout.")
     args = parser.parse_args(argv)
 
@@ -44,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ledger_out:
         write_memory_ledger(ledger, args.ledger_out)
+    if args.summary_out:
+        write_finding_summary(ledger, args.summary_out)
 
     if args.json:
         print(json.dumps(ledger, indent=2, sort_keys=True))
@@ -55,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("")
             print("Machine-readable memory ledger: rerun with --json or add --ledger-out PATH.")
+        if args.summary_out:
+            print(f"Human-readable finding summary: {args.summary_out}")
+        else:
+            print("Human-readable finding summary: add --summary-out PATH.")
     return 0
 
 

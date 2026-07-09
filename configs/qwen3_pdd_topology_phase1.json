@@ -91,7 +91,8 @@
   ],
   "artifact_policy": {
     "memory_ledger_schema_version": "ds5.pdd_memory_ledger.v1",
-    "default_ledger_path": "artifacts/pdd/ds5-f001-memory-ledger.json"
+    "default_ledger_path": "artifacts/pdd/ds5-f001-memory-ledger.json",
+    "default_summary_path": "docs/findings/ds5-f001-pdd-topology-acceptance.md"
   },
   "limits_of_claim": [
     "This manifest validates topology and memory-budget scaffolding only.",

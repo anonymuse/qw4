@@ -197,13 +197,18 @@
       "additionalProperties": false,
       "required": [
         "memory_ledger_schema_version",
-        "default_ledger_path"
+        "default_ledger_path",
+        "default_summary_path"
       ],
       "properties": {
         "memory_ledger_schema_version": {
           "const": "ds5.pdd_memory_ledger.v1"
         },
         "default_ledger_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default_summary_path": {
           "type": "string",
           "minLength": 1
         }
