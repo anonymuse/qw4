@@ -2,6 +2,8 @@
 
 Status: first publishable milestone definition.
 
+Backlog tracking: [DS5-F000 Phase 0 Transport Finding](backlog/feature-000-phase0-transport-finding.md).
+
 ## Sharp Question
 
 Can an M5 Pro coordinator coordinate Qwen3-shaped MoE activation/result movement across two M5 Max workers without interconnect and scheduling overhead dominating decode-shaped work?
@@ -112,4 +114,3 @@ After this milestone, decide one of:
 - redesign packetization and scheduling;
 - reduce remote expert movement assumptions;
 - abandon distributed decode as the first public finding and publish the measured limit.
-

@@ -12,6 +12,17 @@ Primary question:
 
 > Can an M5 Pro coordinator coordinate Qwen3-shaped MoE activation/result movement across two M5 Max workers without interconnect and scheduling overhead dominating decode-shaped work?
 
+ARB refresh result:
+
+> Conditionally approved for continued Phase 1 placement-contract work. Not approved for model loading, tokenizer integration, speculative decoding, fused routing, prefetch work, or Metal kernels.
+
+Current goal sequence:
+
+1. Complete `DS5-F001A: Placement Contract Hardening`.
+2. Run `DS5-F000: Phase 0 Transport Finding`.
+3. Complete `DS5-F001B: Runtime Placement Evidence`.
+4. Start `DS5-F002` only after Phase 0 transport evidence supports continued distributed decode work.
+
 ## Active Work Packs
 
 | Work pack | Status | Notes |
@@ -20,7 +31,7 @@ Primary question:
 
 ## Merged Coordination Workflow Status
 
-Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/83f9/qw4`.
+Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/5e1a/qw4`.
 
 | Item | Current truth | Evidence | Next action |
 |---|---|---|---|
@@ -28,7 +39,8 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/83f9/qw4`.
 | Backlog docs | merged | PR #6 `codex/create-feature-backlog-docs` merged to `main` at `f440910`; branch tip `41decce` is reachable. | Use `docs/backlog/README.md` as current backlog catalogue. |
 | Concurrent transport harness | merged | PR #5 `codex/add-concurrent-transport-harness` merged to `main` at `1a435ba`; branch tip `b99a9d9` is reachable. | Treat associated clean worktree as cleanup candidate after owner confirmation. |
 | DS5-F001 PDD topology | merged | PR #8 `codex/ds5-f001-pdd-topology` merged to `main` at `310ad6d`; remote PR tip `df32794` is merged, while local branch tip `a483426` is a clean divergent equivalent/older local tip. | Review local branch before branch cleanup; preserve until confirmed redundant. |
-| Open PRs | none found | `gh pr list --state open --limit 50` returned no open PRs. | New work should start from `main` or a fresh task branch. |
+| DS5-F001 PDD artifacts | merged | PR #12 `codex/ds5-f001-pdd-artifacts` merged to `main` at `90b3fbd` on 2026-07-09. | Treat as scaffold/planning evidence only; complete `DS5-F001A` before deeper runtime work. |
+| Open PRs | two drafts | Draft PR #13 `codex/ds5-f002-routing-scaffold`; draft PR #14 `codex/arb-plan-refresh`. | Review PR #14 first, then review PR #13 against the ARB gate order before merging. |
 
 ## Task Board
 
@@ -38,8 +50,11 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/83f9/qw4`.
 | B | unassigned | merged seed | PR #5 and later integration branches | `benchmarks/schemas/`, `tests/fixtures/` | `python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke` | `docs/work-packs/2026-07-09-overnight/agent-b-benchmark-schemas.md` |
 | C | unassigned | merged seed | PR #3, PR #4, and PR #5 | `src/transport/`, transport smoke command | loopback transport smoke command | `docs/work-packs/2026-07-09-overnight/agent-c-loopback-transport.md` |
 | D | unassigned | merged seed | PR #2 and later integration branches | `configs/`, `benchmarks/scenarios/` | scenario parser or smoke run | `docs/work-packs/2026-07-09-overnight/agent-d-configs-scenarios.md` |
-| E / DS5-F001 | Codex | validation passed; ready for review | `codex/ds5-f001-pdd-artifacts` / `/Users/jessewhite/.codex/worktrees/b5b8/qw4` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/` | `make pdd-topology-validate`; `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.model.test_pdd_topology`; `make test` all passed | final handoff from this branch |
-| DS5-F002 | Codex | validation passed; ready for review | `codex/ds5-f002-routing-scaffold` / `/Users/jessewhite/.codex/worktrees/dd81/qw4` | `configs/qwen3_fused_routing_phase0.json`, `configs/schemas/fused-routing-manifest.schema.json`, `src/model/routing_plan.py`, `tools/model_inspect/validate_routing_plan.py`, `tests/model/test_routing_plan.py`, `docs/findings/ds5-f002-routing-scaffold.md`, `Makefile` | `make routing-plan-validate`; `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.report.test_validate_run tests.model.test_pdd_topology tests.model.test_routing_plan`; `make test` all passed | final handoff from this branch |
+| E / DS5-F001 | unassigned | umbrella split after ARB review | PR #12 merged to `main` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/`, `docs/backlog/` | Subfeature-specific validation | Parent feature is now split into `DS5-F001A` planning hardening and `DS5-F001B` runtime evidence. |
+| ARB-PLAN | Codex | draft PR #14 | `codex/arb-plan-refresh` / `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `README.md`, `docs/backlog/`, `docs/coordination/active-board.md` | `git diff --cached --check` | Incorporates `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` into project plan and feature goals. |
+| DS5-F001A | unassigned | next feature work | fresh branch needed from `main` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/`, `docs/backlog/` | `make test`; `make pdd-topology-validate` | Harden placement contract, model constants, evidence metadata, context assumption, tensor-class placeholders, runtime-path constraints, and schema-authority docs. |
+| DS5-F000 | unassigned | queued after `DS5-F001A` | fresh branch needed from `main` | `src/transport/`, `benchmarks/`, `tools/report/`, `docs/findings/`, `docs/backlog/` | target-hardware A/B/C run plus artifact schema validation | Answer Phase 0 transport go/no-go before fused routing or model-runtime work. |
+| DS5-F001B | unassigned | queued after `DS5-F001A` and Phase 0 go/no-go | fresh branch needed from `main` | runtime startup paths, `src/model/`, `tools/model_inspect/`, `configs/`, `docs/findings/`, `docs/backlog/` | startup/warmup memory ledger validation and worker ownership logs | Prove runtime placement behavior separately from scaffold/planning evidence. |
 | F | unassigned | merged seed | PR #2 and later integration branches | `tools/report/`, `publication/`, `docs/findings/` | report generation from fixture artifacts | `docs/work-packs/2026-07-09-overnight/agent-f-reporting-publication.md` |
 
 ## Worktree Census
@@ -48,10 +63,10 @@ Classification rules: `active` means still tied to an open coordination task or 
 
 | Path | Branch or commit | Clean/dirty | Related PR/branch/task | Classification | Recommendation | Prune safety |
 |---|---|---|---|---|---|---|
-| `/Users/jessewhite/Code/personal/qw4` | `main` at `ebe0996` | clean | primary checkout, `origin/main` | active | Preserve as stable integration checkout. | preserve |
-| `/Users/jessewhite/.codex/worktrees/83f9/qw4` | `codex/worktree-census` from `ebe0996` | clean after census commit | current census task | active | Open draft PR if possible, then preserve until merged. | preserve |
-| `/Users/jessewhite/.codex/worktrees/97fa/qw4` | `codex/local-model-metadata-smoke` at `2e6ff00` | clean | local GGUF metadata smoke rescue work | active | Preserve; branch contains newly rescued work and should be reviewed or PR'd separately. | preserve |
-| `/Users/jessewhite/.codex/worktrees/bc6f/qw4` | `codex/coordination-workflow` at `22dd5c0` | clean | PR #7 merged from remote tip `2688df1`; local branch still has a unique cherry-pick-visible commit | needs-rescue | Preserve until coordinator compares or intentionally abandons the local branch. | needs review |
+| `/Users/jessewhite/Code/personal/qw4` | `main` at `90b3fbd` | clean | primary checkout, `origin/main` | active | Preserve as stable integration checkout. | preserve |
+| `/Users/jessewhite/.codex/worktrees/5e1a/qw4` | `codex/arb-plan-refresh` at `4cbd099` plus PR #14 board update | dirty | draft PR #14 | active | Review and merge after validation; preserve until merged or explicitly abandoned. | preserve |
+| `/Users/jessewhite/.codex/worktrees/b5b8/qw4` | `codex/ds5-f001-pdd-artifacts` at `0c9c944` | clean | PR #12 merged to `main` at `90b3fbd` | merged | Cleanup candidate after owner confirmation. | confirm before prune |
+| `/Users/jessewhite/.codex/worktrees/dd81/qw4` | `codex/ds5-f002-routing-scaffold` at `63a52a5` | clean | draft PR #13 | active review | Preserve; review against the ARB gate order before merge. | preserve |
 
 Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation:
 
@@ -73,32 +88,25 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 
 | Branch | Status | Evidence | Next action |
 |---|---|---|---|
-| `codex/worktree-census` | active | Current docs-only census branch and draft PR #9. | Update PR #9 with this cleanup follow-up. |
-| `codex/local-model-metadata-smoke` | active rescue | Created from formerly detached `97fa`; committed `2e6ff00` with local GGUF metadata smoke tooling. | Review, rebase if needed, then decide whether to push/PR. |
-| `codex/coordination-workflow` | cleanup review | PR #7 is merged, but local branch tip `22dd5c0` remains unique under `git log --cherry-pick main...codex/coordination-workflow`. | Compare before pruning its worktree or deleting branch. |
-| `codex/ds5-f001-pdd-topology` | branch cleanup review | Worktree was pruned after patch-equivalence review; local branch tip `a483426` still differs from merged remote tip `df32794`. | Delete branch only after separate confirmation. |
-| `backup/local-main-before-origin-sync-20260709` | backup review | Backup pointer remains at `d9efe4e`; related clean worktree was pruned after rescue branch was created. | Decide whether the backup branch is still useful. |
-| `codex/add-concurrent-transport-harness` | merged branch cleanup | Branch tip `b99a9d9` is merged via PR #5; worktree pruned. | Delete branch only after separate confirmation. |
-| `codex/create-feature-backlog-docs` | merged branch cleanup | Branch tip `41decce` is merged via PR #6; worktree pruned. | Delete branch only after separate confirmation. |
-| `codex/ds5-localmodel-testing-main` | merged branch cleanup | Points at `18513a7`, same commit as merged PR #4 line; worktree pruned. | Delete branch only after separate confirmation. |
+| `codex/arb-plan-refresh` | draft PR #14 | Current docs-only branch incorporates the 20260609 ARB feedback into the project plan, backlog feature split, and active board. | Review and merge after docs validation. |
+| `codex/ds5-f001-pdd-artifacts` | merged branch cleanup | Branch tip `0c9c944` is included in the PR #12 merge at `90b3fbd`; worktree `/Users/jessewhite/.codex/worktrees/b5b8/qw4` is clean. | Delete branch or prune worktree only after separate confirmation. |
+| `codex/ds5-f002-routing-scaffold` | draft PR #13 with ARB gate conflict risk | Branch tip `63a52a5` exists on origin and starts after `90b3fbd`, but F002 is now blocked behind `DS5-F001A` and `DS5-F000`. | Preserve; rebase or retarget after the ARB plan lands, and do not merge as runtime progress until prerequisites are resolved. |
 
 ## Stale Or Detached Worktrees Needing Owner Confirmation
 
 | Worktree set | State | Confirmation needed |
 |---|---|---|
-| None remaining | Current worktrees are `main`, `codex/worktree-census`, `codex/local-model-metadata-smoke`, and `codex/coordination-workflow`. | Preserve active/review worktrees until their branches are resolved. |
+| None detected in current `git worktree list` | Current worktrees are `main`, `codex/arb-plan-refresh`, `codex/ds5-f001-pdd-artifacts`, and `codex/ds5-f002-routing-scaffold`. | Preserve active/review worktrees until their branches are resolved. |
 
 ## Integration Queue
 
 | Item | Source | Status | Coordinator notes |
 |---|---|---|---|
 | Confirm build and test commands | all tasks | open | Keep commands in runbooks once stable. |
-| Reconcile completed seed work into current board statuses | all tasks | done | Seed rows now point at merged PR evidence or active backlog work. |
 | Decide whether to keep `docs/backlog/` as aliases only | coordination | open | `docs/backlog/README.md` is currently a real feature catalogue; keep `docs/coordination/` as the active operating board. |
-| Rescue dirty detached local-model work | `/Users/jessewhite/.codex/worktrees/97fa/qw4` | done | Rescued to `codex/local-model-metadata-smoke` and committed as `2e6ff00`; worktree is clean. |
-| Review divergent local copies of merged PR branches | `codex/coordination-workflow`, `codex/ds5-f001-pdd-topology` | open | `codex/coordination-workflow` worktree is preserved; `codex/ds5-f001-pdd-topology` worktree was pruned but branch remains. Delete branches only after separate confirmation. |
-| Confirm and prune clean stale worktrees | worktree census | done | Confirmed one at a time and pruned redundant worktrees; no stale detached worktrees remain. |
-| Codify repo-level Codex workflow | `AGENTS.md` | in review | Branch `codex/add-agents-workflow` adds durable project guidance for task branches, worktrees, startup reading, validation, PRs, and cleanup confirmation. |
+| Incorporate ARB feedback into feature plan | draft PR #14 / `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` | in review | Branch `codex/arb-plan-refresh` adds the ARB project plan and splits `DS5-F001` into `DS5-F001A` and `DS5-F001B`, with `DS5-F000` inserted before fused routing. |
+| Review F002 routing scaffold against ARB gate order | draft PR #13 / `codex/ds5-f002-routing-scaffold` | open | Preserve the branch, but do not treat F002 as unblocked until `DS5-F001A` and `DS5-F000` are resolved. |
+| Clean up merged F001 artifact branch/worktree | `codex/ds5-f001-pdd-artifacts` | open | PR #12 is merged and the worktree is clean; prune/delete only after explicit branch-cleanup confirmation. |
 
 ## Coordinator Checklist
 
@@ -111,8 +119,9 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 
 ## Next Coordinator Actions
 
-1. Review `codex/local-model-metadata-smoke` (`2e6ff00`) and decide whether to rebase, push, and open a PR.
-2. Compare local `codex/coordination-workflow` against merged PR #7 before pruning `/Users/jessewhite/.codex/worktrees/bc6f/qw4` or deleting the branch.
-3. Decide whether preserved branch pointers such as `codex/ds5-f001-pdd-topology`, merged feature branches, and backup branches are still useful.
-4. Delete branches only after a separate branch-cleanup confirmation pass.
-5. Start any new DS5 work from `main` with one task, one branch, one worktree, and one task-board row.
+1. Review and merge draft PR #14 `codex/arb-plan-refresh`, then start `DS5-F001A` from `main`.
+2. After `DS5-F001A`, run `DS5-F000` on the target A/B/C topology before fused routing or model-runtime work.
+3. Review draft PR #13 `codex/ds5-f002-routing-scaffold` against the ARB gate order; preserve it, but do not merge it as unblocked runtime work unless prerequisites are satisfied or scope is narrowed.
+4. Confirm whether to prune `/Users/jessewhite/.codex/worktrees/b5b8/qw4` and delete `codex/ds5-f001-pdd-artifacts` now that PR #12 is merged.
+5. Delete branches only after a separate branch-cleanup confirmation pass.
+6. Start any new DS5 work from `main` with one task, one branch, one worktree, and one task-board row.

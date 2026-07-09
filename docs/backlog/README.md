@@ -1,6 +1,6 @@
 # DS5 Agile Backlog
 
-Status: active backlog draft for the Qwen3 composite architecture recommendation.
+Status: active backlog after ARB feedback incorporation.
 
 Created: 2026-07-09.
 
@@ -8,7 +8,7 @@ Created: 2026-07-09.
 
 This backlog codifies the five mandatory composite-architecture pillars as trackable DS5 Features and Epics.
 
-The governing source pack named in [Documentation Reconciliation](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/documentation-reconciliation.md) is the master planning baseline:
+The governing source pack named in [Documentation Reconciliation](../documentation-reconciliation.md) is the master planning baseline:
 
 - `DS5_Project_Spec_v0.2_Qwen3_235B_A22B.md`
 - `DS5_System_Architecture_v0.2_Qwen3_235B_A22B.md`
@@ -16,13 +16,22 @@ The governing source pack named in [Documentation Reconciliation](/Users/jessewh
 - `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`
 - `DS5_Execution_Plan_Input_v0.2_Qwen3_235B_A22B.md`
 
-The source-pack files themselves are not present in this worktree. Gate names below are therefore normalized against the repo-visible baseline in [Assumptions](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/assumptions.md), [Minimum Viable Finding](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/minimum-viable-finding.md), [ADR-001](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/decisions/ADR-001-model-selection.md), [ADR-002](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/decisions/ADR-002-phase0-transport-first.md), and [Risk Register](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/risk-register.md).
+The source-pack files themselves are not present in this worktree. Gate names below are therefore normalized against the repo-visible baseline in [Assumptions](../assumptions.md), [Minimum Viable Finding](../minimum-viable-finding.md), [ADR-001](../decisions/ADR-001-model-selection.md), [ADR-002](../decisions/ADR-002-phase0-transport-first.md), and [Risk Register](../risk-register.md).
 
 ## Current Goal Status
 
-The requested backlog conversion is complete in this directory.
+The requested backlog conversion is complete in this directory, and the ARB feedback in `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` has been folded into [Project Plan After ARB Refresh](project-plan.md).
 
 The underlying runtime goals are not complete. The repo currently contains Phase 0 constants, transport scaffolding, benchmark schemas, local smoke findings, and placement planning tools. It does not yet contain a full tokenizer/runtime, primary MoE weight loader, fused router protocol, heterogeneous Zig allocator, NVMe prefetcher, or Metal expert kernels.
+
+Current goal order:
+
+1. Complete `DS5-F001A: Placement Contract Hardening`.
+2. Run `DS5-F000: Phase 0 Transport Finding`.
+3. Complete `DS5-F001B: Runtime Placement Evidence`.
+4. Start `DS5-F002` only after the Phase 0 finding supports continued distributed decode work.
+
+The ARB decision is conditional approval for continued Phase 1 placement-contract work. It is not approval for model loading, tokenizer integration, speculative decoding, fused routing, prefetch work, or Metal kernels.
 
 ## Epic Catalogue
 
@@ -38,6 +47,7 @@ The underlying runtime goals are not complete. The repo currently contains Phase
 
 | Gate ID | Gate | Governing Source | Completion Meaning |
 |---|---|---|---|
+| PM-GATE-PH0-01 | Phase 0 Transport And Simulated-MoE Finding | Minimum Viable Finding and ADR-002 | Target-hardware A/B/C transport artifacts answer the first physical go/no-go question before deeper runtime work. |
 | PM-GATE-RT-01 | Runtime Placement And Memory-Cap Conformance | Model Runtime Placement Spec | Runtime placement matches Node A/B/C ownership and per-node memory caps under measured allocation telemetry. |
 | PM-GATE-TR-01 | Thunderbolt Block-Routing Transport Evidence | Benchmark And Acceptance Spec | Fused block-routing traffic meets packet, latency, checksum, concurrency, and artifact requirements on acceptance hardware. |
 | PM-GATE-QNT-01 | Quantization Envelope And Quality-Drift Evidence | Model Runtime Placement Spec and Benchmark And Acceptance Spec | Tensor precision, active-read envelope, allocator accounting, and quality drift pass measured acceptance checks. |
@@ -48,11 +58,14 @@ The underlying runtime goals are not complete. The repo currently contains Phase
 
 | ID | Epic | Feature | Status | Complexity | PM Validation Gate | Feature File |
 |---|---|---|---|---:|---|---|
-| DS5-F001 | DS5-E01 Runtime Topology And Placement | Prefill/Decode Disaggregation (PDD) Topology | In progress: planning constants only; goal not met | 8 | `PM-GATE-RT-01: Runtime Placement And Memory-Cap Conformance` | [feature-001-pdd-topology.md](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/backlog/feature-001-pdd-topology.md) |
-| DS5-F002 | DS5-E02 Routing Transport | Fused Gating And Zero-Copy Routing Protocol | In progress: Phase 0 transport harness exists; goal not met | 9 | `PM-GATE-TR-01: Thunderbolt Block-Routing Transport Evidence` | [feature-002-fused-gating-zero-copy-routing.md](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/backlog/feature-002-fused-gating-zero-copy-routing.md) |
-| DS5-F003 | DS5-E03 Quantization And Memory Runtime | Asymmetric Quantization Pipeline | In progress: Python planning estimator only; goal not met | 8 | `PM-GATE-QNT-01: Quantization Envelope And Quality-Drift Evidence` | [feature-003-asymmetric-quantization-pipeline.md](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/backlog/feature-003-asymmetric-quantization-pipeline.md) |
-| DS5-F004 | DS5-E04 Cold Expert Promotion | Asynchronous Rolling Pre-fetch Buffer | Not started; goal not met | 10 | `PM-GATE-PF-01: Storage Promotion And Cold-Miss Latency-Hiding Evidence` | [feature-004-async-rolling-prefetch-buffer.md](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/backlog/feature-004-async-rolling-prefetch-buffer.md) |
-| DS5-F005 | DS5-E05 Metal Worker Kernels | Localized Metal Kernel Fragmentation | Not started; goal not met | 9 | `PM-GATE-MTL-01: Metal Kernel Stability And Long-Run TDR Evidence` | [feature-005-localized-metal-kernel-fragmentation.md](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/backlog/feature-005-localized-metal-kernel-fragmentation.md) |
+| DS5-F001 | DS5-E01 Runtime Topology And Placement | Prefill/Decode Disaggregation (PDD) Topology | Umbrella split into F001A and F001B; parent goal not met | 8 | `PM-GATE-RT-01: Runtime Placement And Memory-Cap Conformance` | [feature-001-pdd-topology.md](feature-001-pdd-topology.md) |
+| DS5-F001A | DS5-E01 Runtime Topology And Placement | Placement Contract Hardening | Next feature work; current scaffold partially satisfies it | 5 | `PM-GATE-RT-01: Runtime Placement And Memory-Cap Conformance` | [feature-001a-placement-contract-hardening.md](feature-001a-placement-contract-hardening.md) |
+| DS5-F000 | DS5-E02 Routing Transport | Phase 0 Transport Finding | Queued after F001A; target-hardware finding not complete | 7 | `PM-GATE-PH0-01: Phase 0 Transport And Simulated-MoE Finding` | [feature-000-phase0-transport-finding.md](feature-000-phase0-transport-finding.md) |
+| DS5-F001B | DS5-E01 Runtime Topology And Placement | Runtime Placement Evidence | Queued after F001A and Phase 0 go/no-go | 8 | `PM-GATE-RT-01: Runtime Placement And Memory-Cap Conformance` | [feature-001b-runtime-placement-evidence.md](feature-001b-runtime-placement-evidence.md) |
+| DS5-F002 | DS5-E02 Routing Transport | Fused Gating And Zero-Copy Routing Protocol | Blocked until Phase 0 finding supports continued distributed decode work | 9 | `PM-GATE-TR-01: Thunderbolt Block-Routing Transport Evidence` | [feature-002-fused-gating-zero-copy-routing.md](feature-002-fused-gating-zero-copy-routing.md) |
+| DS5-F003 | DS5-E03 Quantization And Memory Runtime | Asymmetric Quantization Pipeline | Deferred; Python planning estimator only, runtime goal not met | 8 | `PM-GATE-QNT-01: Quantization Envelope And Quality-Drift Evidence` | [feature-003-asymmetric-quantization-pipeline.md](feature-003-asymmetric-quantization-pipeline.md) |
+| DS5-F004 | DS5-E04 Cold Expert Promotion | Asynchronous Rolling Pre-fetch Buffer | Deferred; goal not met | 10 | `PM-GATE-PF-01: Storage Promotion And Cold-Miss Latency-Hiding Evidence` | [feature-004-async-rolling-prefetch-buffer.md](feature-004-async-rolling-prefetch-buffer.md) |
+| DS5-F005 | DS5-E05 Metal Worker Kernels | Localized Metal Kernel Fragmentation | Deferred; goal not met | 9 | `PM-GATE-MTL-01: Metal Kernel Stability And Long-Run TDR Evidence` | [feature-005-localized-metal-kernel-fragmentation.md](feature-005-localized-metal-kernel-fragmentation.md) |
 
 ## Merge Governance
 

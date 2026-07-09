@@ -1,6 +1,6 @@
 # Feature DS5-F005: Localized Metal Kernel Fragmentation
 
-Status: not started; runtime goal not met.
+Status: deferred until placement-contract, Phase 0 transport, and worker-runtime gates justify Metal kernel work; runtime goal not met.
 
 Epic: `DS5-E05: Metal Worker Kernels`
 
@@ -8,7 +8,7 @@ Complexity Score: 9/10 for Zig 1.0 bare-metal implementation difficulty.
 
 PM Validation Gate: `PM-GATE-MTL-01: Metal Kernel Stability And Long-Run TDR Evidence`
 
-Governing baseline: `DS5_System_Architecture_v0.2_Qwen3_235B_A22B.md`, `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/assumptions.md), and [Risk Register](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/risk-register.md).
+Governing baseline: `DS5_System_Architecture_v0.2_Qwen3_235B_A22B.md`, `DS5_Benchmark_and_Acceptance_Spec_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](../assumptions.md), [Risk Register](../risk-register.md), and [Project Plan After ARB Refresh](project-plan.md).
 
 ## Technical Scope
 
@@ -52,4 +52,3 @@ The merge request must attach or reference:
 - Any missing command-buffer timing telemetry.
 - Any WindowServer hardware command buffer timeout, GPU reset, or device loss during the acceptance run.
 - Any kernel path that violates B/C memory headroom or blocks worker health/transport loops.
-

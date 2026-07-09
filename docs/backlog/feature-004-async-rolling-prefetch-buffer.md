@@ -1,6 +1,6 @@
 # Feature DS5-F004: Asynchronous Rolling Pre-fetch Buffer
 
-Status: not started; runtime goal not met.
+Status: deferred until placement-contract, Phase 0 transport, and quantization gates justify cold expert promotion work; runtime goal not met.
 
 Epic: `DS5-E04: Cold Expert Promotion`
 
@@ -8,7 +8,7 @@ Complexity Score: 10/10 for Zig 1.0 bare-metal implementation difficulty.
 
 PM Validation Gate: `PM-GATE-PF-01: Storage Promotion And Cold-Miss Latency-Hiding Evidence`
 
-Governing baseline: `DS5_Model_Runtime_Placement_Spec_v0.2_Qwen3_235B_A22B.md`, `DS5_System_Architecture_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/assumptions.md), and [Risk Register](/Users/jessewhite/.codex/worktrees/c9a3/qw4/docs/risk-register.md).
+Governing baseline: `DS5_Model_Runtime_Placement_Spec_v0.2_Qwen3_235B_A22B.md`, `DS5_System_Architecture_v0.2_Qwen3_235B_A22B.md`, [DS5 Assumptions](../assumptions.md), [Risk Register](../risk-register.md), and [Project Plan After ARB Refresh](project-plan.md).
 
 ## Technical Scope
 
@@ -53,4 +53,3 @@ The merge request must attach or reference:
 - Any hotness claim that is not tied to measured routing traces.
 - Any use of buffered filesystem I/O presented as `O_DIRECT` without PM-approved platform evidence.
 - Any cold expert promotion that causes decode stalls in the acceptance scenario.
-
