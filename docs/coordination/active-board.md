@@ -19,9 +19,10 @@ ARB refresh result:
 Current goal sequence:
 
 1. `DS5-F001A: Placement Contract Hardening` is complete via PR #19.
-2. Run `DS5-F000: Phase 0 Transport Finding`.
-3. Complete `DS5-F001B: Runtime Placement Evidence`.
-4. Start `DS5-F002` only after both prerequisites are satisfied: `DS5-F001A` complete and `DS5-F000` target-hardware transport evidence supports continued distributed decode work.
+2. If only the MacBook Air is available, run `DS5-F000L: Local Phase 0 Artifact Rehearsal` as prep-only artifact plumbing work.
+3. Run `DS5-F000: Phase 0 Transport Finding` on the target A/B/C topology when cluster hardware is available.
+4. Complete `DS5-F001B: Runtime Placement Evidence`.
+5. Start `DS5-F002` only after both prerequisites are satisfied: `DS5-F001A` complete and `DS5-F000` target-hardware transport evidence supports continued distributed decode work.
 
 ## Active Work Packs
 
@@ -55,6 +56,7 @@ Last census: 2026-07-09 from `/Users/jessewhite/.codex/worktrees/5e1a/qw4`.
 | ARB-PLAN | Codex | merged via recovery PR #15 | `codex/recover-merge-13-apply-14` / `/Users/jessewhite/.codex/worktrees/dd81/qw4` | `README.md`, `docs/backlog/`, `docs/coordination/active-board.md` | `git diff --check origin/main..HEAD`; `make test` passed on recovery branch | PR #14 was superseded after accidental PR #13 merge; PR #15 landed the ARB plan and reverted premature F002 scaffold from `main`. |
 | DS5-F001A | Codex | merged via PR #19 | `codex/ds5-f001a-placement-hardening` / `/Users/jessewhite/.codex/worktrees/fdf6/qw4` | `src/model/`, `tools/model_inspect/`, `configs/`, `configs/schemas/`, `tests/model/`, `docs/findings/`, `docs/backlog/`, `docs/coordination/active-board.md` | `make pdd-topology-validate`; `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.model.test_pdd_topology`; `make test`; `git diff --check` all passed | Placement-contract hardening gate is complete. Continue to `DS5-F000` target-hardware transport evidence before `DS5-F002`. |
 | DS5-F000 | unassigned | next target-hardware feature; routing-payload scaffold available as prep evidence | fresh branch needed from `main` | `src/transport/`, `benchmarks/`, `tools/report/`, `docs/findings/`, `docs/backlog/` | target-hardware A/B/C run plus artifact schema validation | Answer Phase 0 transport go/no-go before fused routing or model-runtime work. Routing-payload scaffold validation may be referenced only as preparatory schema/test evidence, not target-hardware proof. |
+| DS5-F000L | unassigned | ready to start while cluster hardware is unavailable | fresh branch `codex/ds5-f000-local-artifact-rehearsal` from current `main` | `docs/runbooks/`, `docs/findings/`, `docs/backlog/`, `tools/report/`, `benchmarks/schemas/`, `tests/report/`, `tests/fixtures/`, `docs/coordination/active-board.md` | `make test`; `python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke`; `python3 tools/report/summarize_phase0.py tests/fixtures/artifacts/transport-smoke`; `git diff --check` | Local MacBook Air rehearsal only: improve artifact plumbing, validator/report ergonomics, and operator runbook clarity without claiming target A/B/C transport evidence or unblocking `DS5-F001B`/`DS5-F002`. |
 | DS5-F000 routing-payload integration follow-up | Codex | validation passed after PR #19 rebase; ready for review | `codex/ds5-f000-routing-payload-integration` / `/Users/jessewhite/.codex/worktrees/9b0b/qw4` | `docs/backlog/feature-000-phase0-transport-finding.md`, `docs/backlog/feature-002-fused-gating-zero-copy-routing.md`, `docs/findings/phase0-routing-payload-scaffold.md`, `tools/model_inspect/README.md`, `configs/qwen3_phase0_routing_payload.json`, `configs/schemas/phase0-routing-payload.schema.json`, `tests/model/test_phase0_routing_payload.py`, `docs/coordination/active-board.md` | `make phase0-routing-payload-validate`; `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.model.test_phase0_routing_payload`; `make test`; `git diff --check` passed | Integrates the merged scaffold into DS5-F000/F002 planning language without treating it as F002 runtime work. DS5-F002 remains blocked because `DS5-F000` is not complete. |
 | DS5-F001B | unassigned | queued after `DS5-F001A` and Phase 0 go/no-go | fresh branch needed from `main` | runtime startup paths, `src/model/`, `tools/model_inspect/`, `configs/`, `docs/findings/`, `docs/backlog/` | startup/warmup memory ledger validation and worker ownership logs | Prove runtime placement behavior separately from scaffold/planning evidence. |
 | F | unassigned | merged seed | PR #2 and later integration branches | `tools/report/`, `publication/`, `docs/findings/` | report generation from fixture artifacts | `docs/work-packs/2026-07-09-overnight/agent-f-reporting-publication.md` |
@@ -110,6 +112,7 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 | Decide whether to keep `docs/backlog/` as aliases only | coordination | open | `docs/backlog/README.md` is currently a real feature catalogue; keep `docs/coordination/` as the active operating board. |
 | Incorporate ARB feedback into feature plan | PR #15 / `/Users/jessewhite/Downloads/20260609-ARB/20260609-ARB.md` | merged | PR #15 reverted accidental PR #13 and landed the ARB project plan, splitting `DS5-F001` into `DS5-F001A` and `DS5-F001B`, with `DS5-F000` inserted before fused routing. |
 | Review routing-payload scaffold against ARB gate order | `codex/ds5-f000-routing-payload-integration` | ready for review | Treat scaffold validation as DS5-F000 preparatory schema/test evidence only. `DS5-F001A` is complete via PR #19, and DS5-F002 remains blocked until `DS5-F000` is complete. |
+| Prepare local-only DS5-F000 rehearsal | `DS5-F000L` | ready to start | Use the MacBook Air for artifact plumbing, report validation, fixture/report ergonomics, and runbook rehearsal only. Do not claim target-hardware evidence or proceed to `DS5-F001B`/`DS5-F002`. |
 | Clean up merged F001 artifact branch/worktree | `codex/ds5-f001-pdd-artifacts` | open | PR #12 is merged and the worktree is clean; prune/delete only after explicit branch-cleanup confirmation. |
 
 ## Coordinator Checklist
@@ -123,9 +126,9 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 
 ## Next Coordinator Actions
 
-1. Run `DS5-F000` on the target A/B/C topology before fused routing or model-runtime work.
-2. Review `codex/ds5-f000-routing-payload-integration` only as DS5-F000/Phase 0 routing-payload planning integration; do not treat it as unblocked F002 runtime progress.
-3. Keep `DS5-F002` blocked until `DS5-F000` target-hardware evidence supports continued distributed decode work.
+1. Start `DS5-F000L` from current `main` while only the MacBook Air is available; keep it explicitly local-only and prep-only.
+2. Run `DS5-F000` on the target A/B/C topology when cluster hardware is available, before fused routing or model-runtime work.
+3. Keep `DS5-F001B` and `DS5-F002` blocked until `DS5-F000` target-hardware evidence supports continued distributed decode work.
 4. Confirm whether to prune `/Users/jessewhite/.codex/worktrees/b5b8/qw4` and delete `codex/ds5-f001-pdd-artifacts` now that PR #12 is merged.
 5. Delete branches only after a separate branch-cleanup confirmation pass.
 6. Start any new DS5 work from `main` with one task, one branch, one worktree, and one task-board row.
