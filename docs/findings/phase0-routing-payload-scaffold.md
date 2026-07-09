@@ -67,5 +67,6 @@ This summary validates synthetic routing payload shape, Qwen top-8 record constr
 - It does not load Qwen weights or tokenizer assets.
 - It does not implement a fused runtime packet decoder, Metal kernels, a KV allocator, or a primary-weight loader.
 - It does not provide copy-count telemetry or benchmark evidence for a zero-copy transport path.
+- The hot-path heap-to-heap copy budget is an unvalidated future design target, not measured copy-count telemetry.
 - It preserves Qwen top-8 routing semantics and does not substitute topology-aware expert choices.
 - It does not unblock DS5-F002; DS5-F002 remains blocked until DS5-F001A and DS5-F000 are complete.

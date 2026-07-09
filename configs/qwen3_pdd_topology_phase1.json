@@ -9,6 +9,99 @@
     "experts": 128,
     "active_experts": 8
   },
+  "evidence_metadata": {
+    "schema_version": "ds5.pdd_memory_evidence.v1",
+    "memory_accounting": {
+      "byte_source_state": "placeholder_cap_test",
+      "allowed_byte_source_states": [
+        "placeholder_cap_test",
+        "measured_runtime",
+        "derived_from_pinned_tensor_metadata"
+      ],
+      "applies_to_fields": [
+        "nodes[].static_memory.primary_moe_decode_bytes",
+        "nodes[].static_memory.dense_decode_bytes",
+        "nodes[].static_memory.router_gate_mirror_bytes",
+        "nodes[].static_memory.other_static_bytes",
+        "nodes[].static_memory.total_static_bytes"
+      ],
+      "placeholder_cap_test": true,
+      "measured_runtime": false,
+      "derived_from_pinned_tensor_metadata": false,
+      "source_detail": "Phase 1 cap-test placeholder bytes chosen to exercise placement limits; replace only with measured runtime bytes or bytes derived from pinned tensor metadata."
+    }
+  },
+  "context_length_assumption": {
+    "evidence_class": "planning_only",
+    "runtime_validated": false,
+    "first_performance_context_tokens": {
+      "min": 8192,
+      "max": 32768
+    },
+    "stretch_context_tokens": 65536,
+    "research_only_context_tokens": {
+      "min": 131072,
+      "max": 262144
+    },
+    "source": "docs/assumptions.md"
+  },
+  "tensor_class_policy_placeholders": {
+    "router_gate": {
+      "evidence_class": "placeholder/planning",
+      "runtime_implemented": false,
+      "policy": "Keep router/gate tensors at FP16 or Q8 until evidence supports a lower precision; B/C local mirrors are required before performance-mode routing.",
+      "notes": [
+        "Node A may hold correctness-mode routing metadata, but not primary MoE decode weights.",
+        "No fused router, tokenizer path, or production packet runtime exists in this scaffold."
+      ]
+    },
+    "attention": {
+      "evidence_class": "placeholder/planning",
+      "runtime_implemented": false,
+      "policy": "Attention tensors remain a layer-owner worker policy placeholder and are not counted from pinned tensor metadata in this manifest.",
+      "notes": [
+        "No primary-weight loader or Metal attention kernel exists in this scaffold."
+      ]
+    },
+    "hot_moe_experts": {
+      "evidence_class": "placeholder/planning",
+      "runtime_implemented": false,
+      "policy": "Hot MoE expert residency is a future worker-local placement policy and must preserve Qwen top-8 expert semantics.",
+      "notes": [
+        "This scaffold does not measure expert hotness or implement promotion."
+      ]
+    },
+    "cold_moe_experts": {
+      "evidence_class": "placeholder/planning",
+      "runtime_implemented": false,
+      "policy": "Cold MoE experts may be modeled as future backing or promotion candidates, but not as steady-state active-weight decode traffic from Node A or NVMe.",
+      "notes": [
+        "No NVMe prefetch, cold-miss, or promotion runtime is implemented."
+      ]
+    },
+    "kv_cache": {
+      "evidence_class": "placeholder/planning",
+      "runtime_implemented": false,
+      "policy": "KV cache ownership is a planning placeholder for B/C worker-owned decode state and remains inside runtime headroom.",
+      "notes": [
+        "No KV allocator, long-context backing path, or runtime allocation ledger exists in this scaffold."
+      ]
+    }
+  },
+  "runtime_path_constraints": {
+    "node_a_steady_state_decode_critical_path": "forbidden_outside_correctness_mode",
+    "correctness_mode_node_a_routing_allowed": true,
+    "performance_mode_requires_bc_local_router_mirrors": true,
+    "steady_state_decode_runtime_implemented": false,
+    "node_a_allowed_decode_roles": [
+      "orchestration",
+      "routing_policy_control",
+      "scheduler_state",
+      "health_and_telemetry",
+      "benchmark_control",
+      "correctness_mode_routing_validation"
+    ]
+  },
   "limits": {
     "byte_unit": "decimal_gb",
     "worker_memory_gb": 48.0,
@@ -97,6 +190,8 @@
   "limits_of_claim": [
     "This manifest validates topology and memory-budget scaffolding only.",
     "It does not load Qwen weights, parse tokenizer assets, implement speculative decoding, or run Metal kernels.",
-    "Static byte buckets are placeholders until pinned tensor metadata and quantization accounting replace them."
+    "Static byte buckets are placeholder cap tests until measured runtime bytes or pinned tensor metadata replace them.",
+    "Context-length values are planning assumptions only and are not runtime KV allocation evidence.",
+    "Node A must stay off the steady-state decode critical path outside correctness mode."
   ]
 }
