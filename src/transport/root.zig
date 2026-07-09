@@ -2,6 +2,7 @@ const std = @import("std");
 const Io = std.Io;
 
 const common = @import("ds5_common");
+const build_options = @import("build_options");
 const protocol = common.protocol;
 
 const net = std.Io.net;
@@ -656,7 +657,9 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("  \"schema_version\": \"phase0.artifacts.v1\",\n");
     try writer.writeAll("  \"run_id\": ");
     try writeJsonString(writer, result.run_id);
-    try writer.writeAll(",\n  \"git_commit\": \"0000000000000000000000000000000000000000\",\n");
+    try writer.writeAll(",\n  \"git_commit\": ");
+    try writeJsonString(writer, build_options.git_commit);
+    try writer.writeAll(",\n");
     try writer.writeAll("  \"software\": {\"name\":\"ds5-phase0\",\"version\":\"0.0.0-local\"},\n");
     try writer.writeAll("  \"started_at\": ");
     try writeRfc3339JsonString(writer, result.start_real_ns);
@@ -806,7 +809,7 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("# DS5 Phase 0 Transport Smoke\n\n");
     try writer.writeAll("## Run\n\n");
     try writer.print("- run_id: `{s}`\n", .{result.run_id});
-    try writer.writeAll("- git_commit: `0000000000000000000000000000000000000000`\n");
+    try writer.print("- git_commit: `{s}`\n", .{build_options.git_commit});
     try writer.writeAll("- started_at: ");
     try writeRfc3339Inline(writer, result.start_real_ns);
     try writer.writeAll("\n- ended_at: ");
