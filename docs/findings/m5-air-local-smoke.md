@@ -15,12 +15,15 @@ This is not a Thunderbolt cluster result, not a worker-node result, not a final 
 |---|---|
 | Repository | `https://github.com/anonymuse/qw4.git` |
 | Validation worktree | `/private/tmp/qw4-m5-air-verify` |
-| Exact commit tested | `d9efe4e88e61500eb8fc1056489aadae6799ae56` |
+| Original detached validation commit | `d9efe4e88e61500eb8fc1056489aadae6799ae56` |
+| Rebased branch smoke commit | `53426cded0bad5eaa39e9ac452de31518e5435fe` |
 | Validation worktree state | detached HEAD, clean except ignored generated artifacts |
 | Run artifact ID | `m5-air-loopback-smoke` |
 | Artifact schema | `phase0.artifacts.v1` |
 
 The primary checkout also had unrelated local edits after the first local commit. The final smoke was therefore run from a detached worktree at the exact commit above so the result is attributable.
+
+After rebasing the acceleration branch onto `origin/main`, the full local smoke helper also passed at `53426cded0bad5eaa39e9ac452de31518e5435fe`. That rebased run generated `phase0.artifacts.v1` output with 1,000 transfers, 223,859,200 bytes sent, and 0 checksum failures.
 
 ## Machine And Toolchain
 
@@ -56,7 +59,8 @@ The primary checkout also had unrelated local edits after the first local commit
 | `zig build run-coordinator -- --config configs/cluster.loopback.toml --scenario benchmarks/scenarios/loopback_transport_smoke.toml --out artifacts/runs/m5-air-loopback-smoke` | PASS | 1,000 transfers, 223,859,200 bytes sent, 0 checksum failures. |
 | `python3 -B tools/report/validate_run.py artifacts/runs/m5-air-loopback-smoke` | PASS | Generated artifacts conform to `phase0.artifacts.v1`. |
 | `python3 -B tools/report/summarize_phase0.py artifacts/runs/m5-air-loopback-smoke` | PASS | Summary parsed generated artifacts and marked result loopback-only. |
-| `tools/local/m5-air-local-smoke.sh` | PASS | Passed after approving Zig cache access in the detached worktree. |
+| `tools/local/m5-air-local-smoke.sh` detached worktree run | PASS | Passed after approving Zig cache access in the detached worktree. |
+| `tools/local/m5-air-local-smoke.sh` rebased branch run | PASS | Passed at `53426cded0bad5eaa39e9ac452de31518e5435fe` after rebasing onto `origin/main`. |
 
 ## Exact Failure Text
 
@@ -110,6 +114,8 @@ The same Zig commands passed when rerun with normal local cache access.
 | Checksum algorithm | `sha256` |
 | Checksum failures | 0 |
 | Artifact validation | PASS |
+
+The detailed latency and throughput rows below are from the original detached validation run. They remain local loopback-only regression signals, and the rebased branch run also passed artifact validation with zero checksum failures.
 
 Selected loopback latency rows:
 
