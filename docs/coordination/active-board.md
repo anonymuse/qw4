@@ -97,6 +97,7 @@ Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation
 | Rescue dirty detached local-model work | `/Users/jessewhite/.codex/worktrees/97fa/qw4` | done | Rescued to `codex/local-model-metadata-smoke` and committed as `2e6ff00`; worktree is clean. |
 | Review divergent local copies of merged PR branches | `codex/coordination-workflow`, `codex/ds5-f001-pdd-topology` | open | `codex/coordination-workflow` worktree is preserved; `codex/ds5-f001-pdd-topology` worktree was pruned but branch remains. Delete branches only after separate confirmation. |
 | Confirm and prune clean stale worktrees | worktree census | done | Confirmed one at a time and pruned redundant worktrees; no stale detached worktrees remain. |
+| Codify repo-level Codex workflow | `AGENTS.md` | in review | Branch `codex/add-agents-workflow` adds durable project guidance for task branches, worktrees, startup reading, validation, PRs, and cleanup confirmation. |
 
 ## Coordinator Checklist
 
