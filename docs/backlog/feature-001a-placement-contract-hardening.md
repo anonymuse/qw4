@@ -1,6 +1,6 @@
 # Feature DS5-F001A: Placement Contract Hardening
 
-Status: next feature work; current DS5-F001 scaffold partially satisfies this goal.
+Status: validation passed; ready for review on `codex/ds5-f001a-placement-hardening`.
 
 Epic: `DS5-E01: Runtime Topology And Placement`
 
@@ -22,6 +22,20 @@ Existing implementation signals:
 - `src/model/pdd_topology.py` performs semantic validation and ledger generation.
 - `tests/model/test_pdd_topology.py` covers valid and invalid placement manifests.
 - `make pdd-topology-validate` emits a planning ledger and acceptance summary.
+
+## Implementation Notes
+
+- `configs/schemas/pdd-placement-manifest.schema.json` is structural only: required objects, field types, and no unexpected keys.
+- `src/model/pdd_topology.py` is the semantic authority for Qwen model constants, A/B/C layer ownership, memory evidence metadata, planning-only context metadata, tensor-class policy placeholders, and Node A runtime-path constraints.
+- Generated evidence remains scaffold/planning only. The ledger distinguishes placeholder cap-test bytes from measured runtime bytes and pinned-tensor-derived bytes.
+- No runtime loading, tokenizer behavior, speculative decoding, KV allocation, Metal kernels, or runtime-performance claims are added by this feature.
+
+## Validation Status
+
+- `make pdd-topology-validate`: pass.
+- `PYTHONPYCACHEPREFIX=/private/tmp/qw4-pycache python3 -m unittest tests.model.test_pdd_topology`: pass.
+- `make test`: pass.
+- `git diff --check`: pass.
 
 ## Rigid Acceptance Criteria
 

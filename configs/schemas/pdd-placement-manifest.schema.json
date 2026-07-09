@@ -2,13 +2,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ds5.local/configs/schemas/pdd-placement-manifest.schema.json",
   "title": "DS5 Phase 1 PDD placement manifest",
+  "description": "Structural schema only. The Python validator is the semantic authority for DS5 Phase 1 placement invariants, model constants, byte-evidence states, and runtime path constraints.",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tensorPolicyPlaceholder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "runtime_implemented",
+        "policy",
+        "notes"
+      ],
+      "properties": {
+        "evidence_class": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "runtime_implemented": {
+          "type": "boolean"
+        },
+        "policy": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    }
+  },
   "required": [
     "$schema",
     "schema_version",
     "feature_id",
     "model",
+    "evidence_metadata",
+    "context_length_assumption",
+    "tensor_class_policy_placeholders",
+    "runtime_path_constraints",
     "limits",
     "nodes",
     "artifact_policy",
@@ -20,10 +58,10 @@
       "minLength": 1
     },
     "schema_version": {
-      "const": "ds5.pdd_placement.v1"
+      "$ref": "#/$defs/nonEmptyString"
     },
     "feature_id": {
-      "const": "DS5-F001"
+      "$ref": "#/$defs/nonEmptyString"
     },
     "model": {
       "type": "object",
@@ -37,19 +75,202 @@
       ],
       "properties": {
         "name": {
-          "const": "Qwen3-235B-A22B"
+          "$ref": "#/$defs/nonEmptyString"
         },
         "variant": {
-          "const": "Qwen3-235B-A22B-Instruct-2507"
+          "$ref": "#/$defs/nonEmptyString"
         },
         "layers": {
-          "const": 94
+          "type": "integer",
+          "minimum": 1
         },
         "experts": {
-          "const": 128
+          "type": "integer",
+          "minimum": 1
         },
         "active_experts": {
-          "const": 8
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidence_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "memory_accounting"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "memory_accounting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "byte_source_state",
+            "allowed_byte_source_states",
+            "applies_to_fields",
+            "placeholder_cap_test",
+            "measured_runtime",
+            "derived_from_pinned_tensor_metadata",
+            "source_detail"
+          ],
+          "properties": {
+            "byte_source_state": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "allowed_byte_source_states": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            },
+            "applies_to_fields": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            },
+            "placeholder_cap_test": {
+              "type": "boolean"
+            },
+            "measured_runtime": {
+              "type": "boolean"
+            },
+            "derived_from_pinned_tensor_metadata": {
+              "type": "boolean"
+            },
+            "source_detail": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        }
+      }
+    },
+    "context_length_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "runtime_validated",
+        "first_performance_context_tokens",
+        "stretch_context_tokens",
+        "research_only_context_tokens",
+        "source"
+      ],
+      "properties": {
+        "evidence_class": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "runtime_validated": {
+          "type": "boolean"
+        },
+        "first_performance_context_tokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "stretch_context_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "research_only_context_tokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "tensor_class_policy_placeholders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "router_gate",
+        "attention",
+        "hot_moe_experts",
+        "cold_moe_experts",
+        "kv_cache"
+      ],
+      "properties": {
+        "router_gate": {
+          "$ref": "#/$defs/tensorPolicyPlaceholder"
+        },
+        "attention": {
+          "$ref": "#/$defs/tensorPolicyPlaceholder"
+        },
+        "hot_moe_experts": {
+          "$ref": "#/$defs/tensorPolicyPlaceholder"
+        },
+        "cold_moe_experts": {
+          "$ref": "#/$defs/tensorPolicyPlaceholder"
+        },
+        "kv_cache": {
+          "$ref": "#/$defs/tensorPolicyPlaceholder"
+        }
+      }
+    },
+    "runtime_path_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_a_steady_state_decode_critical_path",
+        "correctness_mode_node_a_routing_allowed",
+        "performance_mode_requires_bc_local_router_mirrors",
+        "steady_state_decode_runtime_implemented",
+        "node_a_allowed_decode_roles"
+      ],
+      "properties": {
+        "node_a_steady_state_decode_critical_path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "correctness_mode_node_a_routing_allowed": {
+          "type": "boolean"
+        },
+        "performance_mode_requires_bc_local_router_mirrors": {
+          "type": "boolean"
+        },
+        "steady_state_decode_runtime_implemented": {
+          "type": "boolean"
+        },
+        "node_a_allowed_decode_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
         }
       }
     },
@@ -66,22 +287,27 @@
       ],
       "properties": {
         "byte_unit": {
-          "const": "decimal_gb"
+          "$ref": "#/$defs/nonEmptyString"
         },
         "worker_memory_gb": {
-          "const": 48.0
+          "type": "number",
+          "minimum": 0
         },
         "static_cap_fraction": {
-          "const": 0.7
+          "type": "number",
+          "minimum": 0
         },
         "runtime_headroom_fraction": {
-          "const": 0.3
+          "type": "number",
+          "minimum": 0
         },
         "static_cap_gb": {
-          "const": 33.6
+          "type": "number",
+          "minimum": 0
         },
         "runtime_headroom_gb": {
-          "const": 14.4
+          "type": "number",
+          "minimum": 0
         }
       }
     },
@@ -105,24 +331,23 @@
         ],
         "properties": {
           "name": {
-            "enum": [
-              "A",
-              "B",
-              "C"
-            ]
+            "$ref": "#/$defs/nonEmptyString"
           },
           "role": {
             "type": "string",
             "minLength": 1
           },
           "memory_gb": {
-            "const": 48.0
+            "type": "number",
+            "minimum": 0
           },
           "static_cap_gb": {
-            "const": 33.6
+            "type": "number",
+            "minimum": 0
           },
           "runtime_headroom_gb": {
-            "const": 14.4
+            "type": "number",
+            "minimum": 0
           },
           "owns_primary_moe_decode": {
             "type": "boolean"
@@ -139,13 +364,11 @@
               "properties": {
                 "start": {
                   "type": "integer",
-                  "minimum": 0,
-                  "maximum": 93
+                  "minimum": 0
                 },
                 "end": {
                   "type": "integer",
-                  "minimum": 0,
-                  "maximum": 93
+                  "minimum": 0
                 }
               }
             }
@@ -186,7 +409,7 @@
           "notes": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/$defs/nonEmptyString"
             }
           }
         }
@@ -202,15 +425,13 @@
       ],
       "properties": {
         "memory_ledger_schema_version": {
-          "const": "ds5.pdd_memory_ledger.v1"
+          "$ref": "#/$defs/nonEmptyString"
         },
         "default_ledger_path": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/nonEmptyString"
         },
         "default_summary_path": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/nonEmptyString"
         }
       }
     },
@@ -218,8 +439,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "string",
-        "minLength": 1
+        "$ref": "#/$defs/nonEmptyString"
       }
     }
   }
