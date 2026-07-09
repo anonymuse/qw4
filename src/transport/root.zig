@@ -60,8 +60,16 @@ pub const WorkerEndpoint = struct {
 
 pub const ClusterConfig = struct {
     name: []const u8,
+    config_kind: []const u8,
     loopback: bool,
+    intended_link: []const u8,
+    network_path_must_be_recorded: bool,
+    confirmed_network_path: []const u8,
     results_warning: []const u8,
+    connect_timeout_ms: u64,
+    heartbeat_interval_ms: u64,
+    heartbeat_timeout_ms: u64,
+    reconnect_attempts: usize,
     workers: [2]WorkerEndpoint,
     worker_count: usize,
 
@@ -87,15 +95,15 @@ pub const MessageStats = struct {
 };
 
 pub const RunMode = enum {
-    network_workers,
     single_process_loopback,
-    single_process_loopback_fallback,
+    socket_localhost,
+    real_cluster,
 
     pub fn label(mode: RunMode) []const u8 {
         return switch (mode) {
-            .network_workers => "network_workers",
             .single_process_loopback => "single_process_loopback",
-            .single_process_loopback_fallback => "single_process_loopback_fallback",
+            .socket_localhost => "socket_localhost",
+            .real_cluster => "real_cluster",
         };
     }
 };
@@ -108,7 +116,18 @@ pub const RunResult = struct {
     mode: RunMode,
     scenario_name: []const u8,
     config_name: []const u8,
+    config_kind: []const u8,
     results_warning: []const u8,
+    scenario_kind: []const u8,
+    network_path: []const u8,
+    socket_mode: []const u8,
+    confirmed_network_path: []const u8,
+    hardware_interpretable: bool,
+    warmup_count: usize,
+    failure_count: u64,
+    retry_count: u64,
+    reconnect_count: u64,
+    timeout_count: u64,
     start_real_ns: i96,
     end_real_ns: i96,
     elapsed_ns: u64,
@@ -148,9 +167,11 @@ pub fn runCoordinator(
 
     if (cluster.loopback) {
         result.mode = .single_process_loopback;
+        refreshRunClassification(cluster, &result);
         try runSingleProcessSmoke(allocator, io, cluster, scenario, &result);
     } else {
-        result.mode = .network_workers;
+        result.mode = classifyRunMode(cluster);
+        refreshRunClassification(cluster, &result);
         try runNetworkSmoke(allocator, io, cluster, scenario, &result);
     }
 
@@ -209,10 +230,21 @@ fn initRunResult(
         .config_path = options.config,
         .scenario_path = options.scenario,
         .out_dir = options.out,
-        .mode = .network_workers,
+        .mode = classifyRunMode(cluster),
         .scenario_name = scenario.name,
         .config_name = cluster.name,
+        .config_kind = cluster.config_kind,
         .results_warning = cluster.results_warning,
+        .scenario_kind = scenarioKindForMode(classifyRunMode(cluster)),
+        .network_path = networkPathForMode(cluster, classifyRunMode(cluster)),
+        .socket_mode = socketModeForMode(classifyRunMode(cluster)),
+        .confirmed_network_path = cluster.confirmed_network_path,
+        .hardware_interpretable = hardwareInterpretable(cluster, classifyRunMode(cluster)),
+        .warmup_count = scenario.warmup_count,
+        .failure_count = 0,
+        .retry_count = 0,
+        .reconnect_count = 0,
+        .timeout_count = 0,
         .start_real_ns = start,
         .end_real_ns = start,
         .elapsed_ns = 0,
@@ -235,9 +267,8 @@ fn runNetworkSmoke(
     scenario: Scenario,
     result: *RunResult,
 ) !void {
-    result.mode = .network_workers;
     for (cluster.workerEndpoints()) |endpoint| {
-        var stream = try connectToAddress(io, endpoint.address);
+        var stream = try connectToEndpointWithReconnect(io, endpoint, cluster, result);
         defer stream.close(io);
 
         var reader_buffer: [64 * 1024]u8 = undefined;
@@ -263,6 +294,63 @@ fn runNetworkSmoke(
     }
 }
 
+fn refreshRunClassification(cluster: ClusterConfig, result: *RunResult) void {
+    result.scenario_kind = scenarioKindForMode(result.mode);
+    result.network_path = networkPathForMode(cluster, result.mode);
+    result.socket_mode = socketModeForMode(result.mode);
+    result.confirmed_network_path = cluster.confirmed_network_path;
+    result.hardware_interpretable = hardwareInterpretable(cluster, result.mode);
+}
+
+fn classifyRunMode(cluster: ClusterConfig) RunMode {
+    if (cluster.loopback) return .single_process_loopback;
+    if (allWorkerEndpointsAreLocal(cluster)) return .socket_localhost;
+    return .real_cluster;
+}
+
+fn allWorkerEndpointsAreLocal(cluster: ClusterConfig) bool {
+    for (cluster.workerEndpoints()) |endpoint| {
+        if (!isLocalEndpoint(endpoint.address)) return false;
+    }
+    return true;
+}
+
+fn isLocalEndpoint(address: []const u8) bool {
+    return std.mem.startsWith(u8, address, "127.0.0.1:") or
+        std.mem.startsWith(u8, address, "localhost:") or
+        std.mem.startsWith(u8, address, "[::1]:") or
+        std.mem.startsWith(u8, address, "::1:");
+}
+
+fn scenarioKindForMode(mode: RunMode) []const u8 {
+    return switch (mode) {
+        .single_process_loopback => "loopback",
+        .socket_localhost => "socket_localhost",
+        .real_cluster => "real_cluster",
+    };
+}
+
+fn socketModeForMode(mode: RunMode) []const u8 {
+    return switch (mode) {
+        .single_process_loopback => "in_process",
+        .socket_localhost => "tcp_localhost",
+        .real_cluster => "tcp_network",
+    };
+}
+
+fn networkPathForMode(cluster: ClusterConfig, mode: RunMode) []const u8 {
+    if (cluster.confirmed_network_path.len != 0) return cluster.confirmed_network_path;
+    if (cluster.intended_link.len != 0 and mode == .real_cluster) return cluster.intended_link;
+    return RunMode.label(mode);
+}
+
+fn hardwareInterpretable(cluster: ClusterConfig, mode: RunMode) bool {
+    if (mode != .real_cluster) return false;
+    if (!cluster.network_path_must_be_recorded) return false;
+    if (cluster.confirmed_network_path.len == 0) return false;
+    return !isLocalEndpoint(cluster.confirmed_network_path);
+}
+
 fn runSingleProcessSmoke(
     allocator: std.mem.Allocator,
     io: Io,
@@ -274,6 +362,31 @@ fn runSingleProcessSmoke(
         try emitNodeDiscoveredEvent(result, endpoint.node, endpoint.address, 0);
         try pingWorkerInProcess(allocator, io, endpoint.node, result);
         try runInProcessTraffic(allocator, io, endpoint.node, scenario, result);
+    }
+}
+
+fn connectToEndpointWithReconnect(
+    io: Io,
+    endpoint: WorkerEndpoint,
+    cluster: ClusterConfig,
+    result: *RunResult,
+) !net.Stream {
+    var attempt: usize = 0;
+    while (true) {
+        if (connectToAddress(io, endpoint.address)) |stream| {
+            if (attempt > 0) {
+                result.reconnect_count += 1;
+                try emitReconnectSucceededEvent(result, endpoint.node, attempt, 0);
+            }
+            return stream;
+        } else |err| {
+            result.failure_count += 1;
+            try emitFailureObservedEvent(result, endpoint.node, "connect_failed", @errorName(err));
+            if (attempt >= cluster.reconnect_attempts) return err;
+            attempt += 1;
+            result.retry_count += 1;
+            try emitRetryScheduledEvent(result, endpoint.node, "connect_failed", attempt);
+        }
     }
 }
 
@@ -651,7 +764,7 @@ fn writeArtifacts(allocator: std.mem.Allocator, io: Io, result: *RunResult) !voi
 
 fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     const checksum_passed = result.total_transfers - result.checksum_failures;
-    const scenario_kind = if (result.mode == .network_workers) "real_cluster" else "loopback";
+    const scenario_kind = result.scenario_kind;
 
     try writer.writeAll("{\n");
     try writer.writeAll("  \"schema_version\": \"phase0.artifacts.v1\",\n");
@@ -670,9 +783,17 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll(if (result.checksum_failures == 0) "true" else "false");
     try writer.writeAll(",\n  \"environment\": {");
     try writer.writeAll("\"network_path\":");
+    try writeJsonString(writer, result.network_path);
+    try writer.writeAll(",\"transport_mode\":");
     try writeJsonString(writer, RunMode.label(result.mode));
+    try writer.writeAll(",\"socket_mode\":");
+    try writeJsonString(writer, result.socket_mode);
+    try writer.writeAll(",\"loopback\":");
+    try writer.writeAll(if (result.mode == .single_process_loopback) "true" else "false");
+    try writer.writeAll(",\"confirmed_network_path\":");
+    try writeJsonString(writer, result.confirmed_network_path);
     try writer.writeAll(",\"clock_sync\":\"single-process or local process clock\",\"hardware_interpretable\":");
-    try writer.writeAll(if (result.mode == .network_workers) "true" else "false");
+    try writer.writeAll(if (result.hardware_interpretable) "true" else "false");
     try writer.writeAll("},\n");
 
     try writer.writeAll("  \"scenario\": {\n");
@@ -687,7 +808,7 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll(",\n    \"block_sizes_bytes\": ");
     try writeMessageSizesJson(writer, result);
     try writer.print(",\n    \"transfer_count\": {d},", .{maxTransferCount(result)});
-    try writer.print("\n    \"warmup_count\": {d},", .{0});
+    try writer.print("\n    \"warmup_count\": {d},", .{result.warmup_count});
     try writer.writeAll("\n    \"checksum_mode\": \"sha256\",\n");
     try writer.writeAll("    \"remote_expert_rates\": [0.0,0.25,0.5,0.75,1.0],\n");
     try writer.writeAll("    \"qwen_shape\": {\"layers\":94,\"hidden_size\":4096,\"top_k\":8,\"packets_per_destination_per_layer\":1,\"layer_owners\":[{\"node_id\":\"B\",\"start_layer\":0,\"end_layer\":46},{\"node_id\":\"C\",\"start_layer\":47,\"end_layer\":93}]}\n");
@@ -711,7 +832,12 @@ fn writeRunJson(writer: *Io.Writer, result: *const RunResult) !void {
         result.checksum_failures,
         if (result.checksum_failures == 0) "pass" else "fail",
     });
-    try writer.writeAll("  \"failure_counts\": {\"failures\":0,\"retries\":0,\"reconnects\":0,\"timeouts\":0},\n");
+    try writer.print("  \"failure_counts\": {{\"failures\":{d},\"retries\":{d},\"reconnects\":{d},\"timeouts\":{d}}},\n", .{
+        result.failure_count,
+        result.retry_count,
+        result.reconnect_count,
+        result.timeout_count,
+    });
     try writer.writeAll("  \"metrics\": {\n");
     try writer.writeAll("    \"latency_by_message_size\": [\n");
     for (result.stats.items, 0..) |stats, i| {
@@ -764,12 +890,13 @@ fn writeLatencyCsv(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("schema_version,run_id,node_pair,direction,message_size_bytes,sample_count,warmup_count,transfer_count,checksum_algorithm,checksum_failures,p50_us,p95_us,p99_us,min_us,max_us,jitter_us,remote_expert_rate,scenario_step\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},0,{d},sha256,{d},{d},{d},{d},{d},{d},{d},0.0,loopback-block-{d}\n",
+            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},{d},sha256,{d},{d},{d},{d},{d},{d},{d},0.0,{s}-block-{d}\n",
             .{
                 result.run_id,
                 protocol.WorkerNode.label(stats.node),
                 stats.message_size,
                 stats.transfer_count,
+                result.warmup_count,
                 stats.transfer_count,
                 stats.checksum_failures,
                 nsToUs(stats.p50_latency_ns),
@@ -778,6 +905,7 @@ fn writeLatencyCsv(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToUs(stats.min_latency_ns),
                 nsToUs(stats.max_latency_ns),
                 nsToUs(stats.p99_latency_ns) -| nsToUs(stats.p50_latency_ns),
+                result.scenario_kind,
                 stats.message_size,
             },
         );
@@ -788,7 +916,7 @@ fn writeThroughputCsv(writer: *Io.Writer, result: *const RunResult) !void {
     try writer.writeAll("schema_version,run_id,node_pair,direction,block_size_bytes,transfer_count,bytes_sent,checksum_algorithm,checksum_failures,duration_ms,mib_per_sec,gbps,concurrent_links,remote_expert_rate,scenario_step\n");
     for (result.stats.items) |stats| {
         try writer.print(
-            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},none,0.0,loopback-block-{d}\n",
+            "phase0.artifacts.v1,{s},A-{s},round_trip,{d},{d},{d},sha256,{d},{d},{d},{d},none,0.0,{s}-block-{d}\n",
             .{
                 result.run_id,
                 protocol.WorkerNode.label(stats.node),
@@ -799,6 +927,7 @@ fn writeThroughputCsv(writer: *Io.Writer, result: *const RunResult) !void {
                 nsToMs(stats.elapsed_ns),
                 bytesPerSecToMibPerSec(stats.throughput_bytes_per_sec),
                 bytesPerSecToGbps(stats.throughput_bytes_per_sec),
+                result.scenario_kind,
                 stats.message_size,
             },
         );
@@ -816,7 +945,10 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
     try writeRfc3339Inline(writer, result.end_real_ns);
     try writer.print("\n- valid: {s}\n", .{if (result.checksum_failures == 0) "true" else "false"});
     try writer.print("- mode: `{s}`\n", .{RunMode.label(result.mode)});
-    try writer.writeAll("- data kind: loopback/protocol smoke, not hardware performance\n\n");
+    try writer.print("- socket mode: `{s}`\n", .{result.socket_mode});
+    try writer.print("- network path: `{s}`\n", .{result.network_path});
+    try writer.print("- hardware interpretable: {s}\n", .{if (result.hardware_interpretable) "true" else "false"});
+    try writer.writeAll("- data kind: transport/protocol smoke; hardware claims require confirmed non-loopback path\n\n");
 
     try writer.writeAll("## Scenario\n\n");
     try writer.print("- scenario: `{s}`\n", .{result.scenario_name});
@@ -867,10 +999,10 @@ fn writeSummary(writer: *Io.Writer, result: *const RunResult) !void {
 
     try writer.writeAll("\n## Reliability\n\n");
     try writer.print("- checksum failures: {d}\n", .{result.checksum_failures});
-    try writer.writeAll("- failures: 0\n");
-    try writer.writeAll("- retries: 0\n");
-    try writer.writeAll("- reconnects: 0\n");
-    try writer.writeAll("- timeouts: 0\n\n");
+    try writer.print("- failures: {d}\n", .{result.failure_count});
+    try writer.print("- retries: {d}\n", .{result.retry_count});
+    try writer.print("- reconnects: {d}\n", .{result.reconnect_count});
+    try writer.print("- timeouts: {d}\n\n", .{result.timeout_count});
 
     try writer.writeAll("## Interpretation\n\n");
     try writer.writeAll(result.results_warning);
@@ -905,8 +1037,50 @@ fn emitWorkerHealthEvent(result: *RunResult, node: protocol.WorkerNode, latency_
     const writer = &result.events.writer;
     try writeEventPrefix(result, "worker_health", "info");
     try writer.print(
-        ",\"node_id\":\"{s}\",\"health_status\":\"healthy\",\"latency_us\":{d},\"details\":{{\"ping_latency_ns\":{d}}}}}\n",
+        ",\"node_id\":\"{s}\",\"health_status\":\"healthy\",\"latency_us\":{d},\"details\":{{\"heartbeat\":true,\"ping_latency_ns\":{d}}}}}\n",
         .{ protocol.WorkerNode.label(node), nsToUs(latency_ns), latency_ns },
+    );
+}
+
+fn emitFailureObservedEvent(
+    result: *RunResult,
+    node: protocol.WorkerNode,
+    failure_kind: []const u8,
+    message: []const u8,
+) !void {
+    const writer = &result.events.writer;
+    try writeEventPrefix(result, "failure_observed", "error");
+    try writer.print(",\"node_id\":\"{s}\",\"failure_kind\":", .{protocol.WorkerNode.label(node)});
+    try writeJsonString(writer, failure_kind);
+    try writer.writeAll(",\"details\":{\"message\":");
+    try writeJsonString(writer, message);
+    try writer.writeAll("}}\n");
+}
+
+fn emitRetryScheduledEvent(
+    result: *RunResult,
+    node: protocol.WorkerNode,
+    failure_kind: []const u8,
+    retry_count: usize,
+) !void {
+    const writer = &result.events.writer;
+    try writeEventPrefix(result, "retry_scheduled", "warn");
+    try writer.print(",\"node_id\":\"{s}\",\"failure_kind\":", .{protocol.WorkerNode.label(node)});
+    try writeJsonString(writer, failure_kind);
+    try writer.print(",\"retry_count\":{d},\"details\":{{}}}}\n", .{retry_count});
+}
+
+fn emitReconnectSucceededEvent(
+    result: *RunResult,
+    node: protocol.WorkerNode,
+    retry_count: usize,
+    latency_us: u64,
+) !void {
+    const writer = &result.events.writer;
+    try writeEventPrefix(result, "reconnect_succeeded", "info");
+    try writer.print(
+        ",\"node_id\":\"{s}\",\"retry_count\":{d},\"latency_us\":{d},\"details\":{{}}}}\n",
+        .{ protocol.WorkerNode.label(node), retry_count, latency_us },
     );
 }
 
@@ -1107,8 +1281,16 @@ pub fn parseScenario(allocator: std.mem.Allocator, text: []const u8) !Scenario {
 pub fn parseClusterConfig(text: []const u8) !ClusterConfig {
     var cluster = ClusterConfig{
         .name = "unknown",
+        .config_kind = "unknown",
         .loopback = false,
+        .intended_link = "",
+        .network_path_must_be_recorded = false,
+        .confirmed_network_path = "",
         .results_warning = "Loopback results validate protocol and artifact plumbing only, not real interconnect performance.",
+        .connect_timeout_ms = 2000,
+        .heartbeat_interval_ms = 1000,
+        .heartbeat_timeout_ms = 5000,
+        .reconnect_attempts = 0,
         .workers = undefined,
         .worker_count = 0,
     };
@@ -1126,10 +1308,26 @@ pub fn parseClusterConfig(text: []const u8) !ClusterConfig {
         }
         if (quotedValue(line, "config_name")) |value| {
             cluster.name = value;
+        } else if (quotedValue(line, "config_kind")) |value| {
+            cluster.config_kind = value;
         } else if (boolValue(line, "loopback")) |value| {
             cluster.loopback = value;
+        } else if (quotedValue(line, "intended_link")) |value| {
+            cluster.intended_link = value;
+        } else if (boolValue(line, "network_path_must_be_recorded")) |value| {
+            cluster.network_path_must_be_recorded = value;
+        } else if (quotedValue(line, "confirmed_network_path")) |value| {
+            cluster.confirmed_network_path = value;
         } else if (quotedValue(line, "results_warning")) |value| {
             cluster.results_warning = value;
+        } else if (intValue(u64, line, "connect_timeout_ms")) |value| {
+            cluster.connect_timeout_ms = value;
+        } else if (intValue(u64, line, "heartbeat_interval_ms")) |value| {
+            cluster.heartbeat_interval_ms = value;
+        } else if (intValue(u64, line, "heartbeat_timeout_ms")) |value| {
+            cluster.heartbeat_timeout_ms = value;
+        } else if (intValue(usize, line, "reconnect_attempts")) |value| {
+            cluster.reconnect_attempts = value;
         } else if (in_node_block) {
             if (quotedValue(line, "id")) |value| {
                 active_node = protocol.WorkerNode.parse(value);
@@ -1279,6 +1477,30 @@ test "frame encoding round trips payload checksum" {
     try std.testing.expectEqual(@as(u64, 42), decoded.header.seq);
     try std.testing.expectEqualStrings(payload, decoded.payload);
     try std.testing.expect(verifyFrame(decoded.header, decoded.payload));
+}
+
+test "cluster parser classifies socket-localhost as non-hardware" {
+    const text =
+        \\config_name = "cluster.socket-localhost"
+        \\config_kind = "socket_localhost"
+        \\loopback = false
+        \\intended_link = "localhost TCP sockets"
+        \\network_path_must_be_recorded = false
+        \\confirmed_network_path = ""
+        \\reconnect_attempts = 2
+        \\[[nodes]]
+        \\id = "B"
+        \\connect_address = "127.0.0.1:7555"
+        \\[[nodes]]
+        \\id = "C"
+        \\connect_address = "localhost:7556"
+        \\
+    ;
+    const cluster = try parseClusterConfig(text);
+    try std.testing.expect(!cluster.loopback);
+    try std.testing.expectEqual(@as(usize, 2), cluster.worker_count);
+    try std.testing.expectEqual(RunMode.socket_localhost, classifyRunMode(cluster));
+    try std.testing.expect(!hardwareInterpretable(cluster, classifyRunMode(cluster)));
 }
 
 test "scenario parser reads loopback traffic shape" {

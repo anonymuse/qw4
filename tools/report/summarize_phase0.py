@@ -229,6 +229,7 @@ def sensitivity_rows(run: dict[str, Any], limit: int = 24) -> list[list[str]]:
         get_path(run, "remote_expert_rate_sensitivity"),
         get_path(run, "simulated_moe.remote_expert_rate_sensitivity"),
         get_path(run, "metrics.remote_expert_rate_sensitivity"),
+        get_path(run, "metrics.predicted_upper_bound_tokens_per_sec"),
         get_path(run, "sensitivity.remote_expert_rates"),
     )
     sensitivity = next((item for item in candidates if isinstance(item, list)), None)
@@ -250,6 +251,7 @@ def sensitivity_rows(run: dict[str, Any], limit: int = 24) -> list[list[str]]:
                         "upper_bound_tokens_per_sec",
                         "predicted_upper_bound_tokens_per_sec",
                         "tokens_per_sec_upper_bound",
+                        "tokens_per_sec",
                     )
                 ),
             ]
@@ -295,14 +297,22 @@ def run_summary(run_dir: Path) -> tuple[str, int]:
         "scheduler_overhead_per_token",
         "scheduler_overhead_us_per_token",
         "scheduler_overhead_ms_per_token",
+        "metrics.scheduler_overhead_us_per_token",
         "metrics.scheduler_overhead_per_token",
         "metrics.coordinator_overhead_per_token",
     )
-    bytes_per_token = get_path(run, "bytes_per_token", "bytes_per_simulated_token", "metrics.bytes_per_token")
+    bytes_per_token = get_path(
+        run,
+        "bytes_per_token",
+        "bytes_per_simulated_token",
+        "metrics.bytes_sent_per_simulated_token",
+        "metrics.bytes_per_token",
+    )
     per_layer_transport = get_path(
         run,
         "per_layer_transport_time",
         "simulated_moe.per_layer_transport_time",
+        "metrics.per_layer_transport_time_us",
         "metrics.per_layer_transport_time",
     )
     path_text, validity_text = classify_transport(run)

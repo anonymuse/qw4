@@ -177,3 +177,22 @@ These fields may evolve once the Zig coordinator exists:
 - predicted token/sec model inputs.
 
 Changing a required field name or unit requires a new schema version.
+
+
+## Schema Evolution Notes
+
+`phase0.artifacts.v1` now distinguishes transport interpretation from transport
+mechanics:
+
+- `environment.transport_mode` may be `single_process_loopback`,
+  `socket_localhost`, or `real_cluster`.
+- `environment.socket_mode` records whether the run used in-process framing,
+  TCP localhost sockets, or TCP network sockets.
+- `environment.confirmed_network_path` is empty unless the operator records the
+  actual non-loopback path used for the run.
+- `environment.hardware_interpretable` must be false for loopback and localhost
+  paths, even when real TCP sockets were used.
+
+Adding optional fields inside `environment` is compatible with
+`phase0.artifacts.v1`. Renaming required fields or changing units requires a new
+schema version.
