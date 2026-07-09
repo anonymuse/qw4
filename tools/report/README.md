@@ -60,3 +60,16 @@ The reporting path works best when Agent B/C artifacts include:
 - event records with timestamp, event type, node ID, severity, retry count, timeout duration, bytes sent, bytes acknowledged, and validity impact.
 
 If a field is absent, reporting should show `not reported` rather than guessing.
+
+
+## Aggregate And Comparison Reports
+
+Use the aggregate helper to compare repeated runs or to show missing result
+classes explicitly:
+
+```bash
+python3 tools/report/aggregate_phase0.py --root artifacts/runs
+```
+
+The report always keeps loopback, socket-localhost, and real-cluster categories
+separate so local smoke data cannot be mistaken for hardware transport data.

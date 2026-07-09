@@ -213,9 +213,26 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
 
     environment = require_object(run["environment"], "run.json.environment")
     require_keys(environment, "run.json.environment", {"network_path", "clock_sync", "hardware_interpretable"})
-    require_str(environment, "network_path", "run.json.environment")
+    network_path = require_str(environment, "network_path", "run.json.environment")
     require_str(environment, "clock_sync", "run.json.environment")
-    require_bool(environment, "hardware_interpretable", "run.json.environment")
+    hardware_interpretable = require_bool(environment, "hardware_interpretable", "run.json.environment")
+    optional_environment_strings = ("transport_mode", "socket_mode", "confirmed_network_path")
+    for key in optional_environment_strings:
+        if key in environment and not isinstance(environment[key], str):
+            fail(f"run.json.environment.{key}: expected string when present")
+    if "loopback" in environment and not isinstance(environment["loopback"], bool):
+        fail("run.json.environment.loopback: expected boolean when present")
+    path_lower = network_path.lower()
+    mode_lower = str(environment.get("transport_mode", "")).lower()
+    socket_lower = str(environment.get("socket_mode", "")).lower()
+    if hardware_interpretable and (
+        "loopback" in path_lower
+        or "localhost" in path_lower
+        or "127.0.0.1" in path_lower
+        or "socket_localhost" in mode_lower
+        or "localhost" in socket_lower
+    ):
+        fail("run.json.environment.hardware_interpretable: localhost/loopback paths cannot be hardware-interpretable")
 
     scenario = require_object(run["scenario"], "run.json.scenario")
     require_keys(
@@ -234,8 +251,8 @@ def validate_run_json(run_dir: Path) -> dict[str, Any]:
             "qwen_shape",
         },
     )
-    if scenario["kind"] not in {"synthetic", "loopback", "real_cluster"}:
-        fail("run.json.scenario.kind: expected synthetic, loopback, or real_cluster")
+    if scenario["kind"] not in {"synthetic", "loopback", "socket_localhost", "real_cluster"}:
+        fail("run.json.scenario.kind: expected synthetic, loopback, socket_localhost, or real_cluster")
     require_str(scenario, "name", "run.json.scenario")
     require_str(scenario, "config_path", "run.json.scenario")
     require_int(scenario, "transfer_count", "run.json.scenario", 1)

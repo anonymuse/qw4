@@ -1,0 +1,89 @@
+# DS5 Phase 0 socket-localhost config.
+# This uses real TCP sockets across separate local worker processes.
+# It must not be interpreted as Thunderbolt or multi-host cluster data.
+
+schema_version = 1
+config_name = "cluster.socket-localhost"
+config_kind = "socket_localhost"
+description = "Single-host, multi-process TCP configuration for exercising coordinator/worker socket behavior."
+
+[interpretation]
+scope = "socket_localhost"
+synthetic = true
+loopback = false
+real_cluster = false
+requires_user_network_config = false
+may_interpret_results_as_real_hardware_data = false
+results_warning = "Socket-localhost results validate multi-process TCP behavior only, not Thunderbolt or multi-host performance."
+
+[cluster]
+id = "ds5-socket-localhost"
+coordinator_node = "A"
+worker_nodes = ["B", "C"]
+required_worker_count = 2
+distinct_physical_hosts_required = false
+intended_link = "localhost TCP sockets"
+network_path_must_be_recorded = false
+confirmed_network_path = "127.0.0.1"
+wifi_fallback_allowed = false
+static_weight_cap_gb_per_48gb_node = 33.6
+runtime_reserve_gb_per_48gb_node = 14.4
+aggregate_static_weight_cap_gb = 100.8
+refuse_static_cap_overrun_without_override = true
+
+[transport]
+protocol = "tcp"
+bind_host = "127.0.0.1"
+connect_timeout_ms = 2000
+read_timeout_ms = 10000
+heartbeat_interval_ms = 1000
+heartbeat_timeout_ms = 5000
+reconnect_attempts = 1
+checksum_required = true
+preferred_checksum_mode = "sha256"
+copy_measurement_required = true
+
+[artifacts]
+default_root = "artifacts/runs"
+record_git_commit = true
+record_hostnames = true
+record_macos_version = true
+record_power_mode = true
+record_confirmed_network_path = true
+
+[[nodes]]
+id = "A"
+role = "coordinator"
+hardware = "single-host socket-localhost"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7554"
+connect_address = "127.0.0.1:7554"
+expected_runtime = "coordinator"
+core_model_weights_allowed = false
+
+[[nodes]]
+id = "B"
+role = "worker"
+hardware = "single-host socket-localhost"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7555"
+connect_address = "127.0.0.1:7555"
+expected_runtime = "worker"
+core_model_weights_allowed = false
+static_weight_cap_gb = 0.0
+runtime_reserve_gb = 0.0
+
+[[nodes]]
+id = "C"
+role = "worker"
+hardware = "single-host socket-localhost"
+memory_gb = 0
+host = "127.0.0.1"
+listen_address = "127.0.0.1:7556"
+connect_address = "127.0.0.1:7556"
+expected_runtime = "worker"
+core_model_weights_allowed = false
+static_weight_cap_gb = 0.0
+runtime_reserve_gb = 0.0

@@ -1,8 +1,13 @@
 const std = @import("std");
 
+const zero_git_commit = "0000000000000000000000000000000000000000";
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    const options = b.addOptions();
+    options.addOption([]const u8, "git_commit", resolveGitCommit(b));
 
     const common = b.addModule("ds5_common", .{
         .root_source_file = b.path("src/common/root.zig"),
@@ -18,6 +23,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "ds5_common", .module = common },
         },
     });
+    transport.addOptions("build_options", options);
 
     const coordinator = b.addExecutable(.{
         .name = "ds5-coordinator",
@@ -105,4 +111,29 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_coordinator_tests.step);
     test_step.dependOn(&run_worker_tests.step);
     test_step.dependOn(&run_loopback_transport_tests.step);
+}
+
+fn resolveGitCommit(b: *std.Build) []const u8 {
+    if (b.option([]const u8, "git-commit", "Git commit to embed in generated benchmark artifacts")) |override| {
+        if (!isLowerHexSha(override)) {
+            std.process.fatal("-Dgit-commit must be a 40-character lowercase hex SHA", .{});
+        }
+        return override;
+    }
+
+    var code: u8 = 0;
+    const stdout = b.runAllowFail(&.{ "git", "rev-parse", "HEAD" }, &code, .ignore) catch return zero_git_commit;
+    const trimmed = std.mem.trim(u8, stdout, " \n\r\t");
+    if (!isLowerHexSha(trimmed)) return zero_git_commit;
+    return trimmed;
+}
+
+fn isLowerHexSha(value: []const u8) bool {
+    if (value.len != 40) return false;
+    for (value) |char| {
+        const is_digit = char >= '0' and char <= '9';
+        const is_lower_hex = char >= 'a' and char <= 'f';
+        if (!is_digit and !is_lower_hex) return false;
+    }
+    return true;
 }
