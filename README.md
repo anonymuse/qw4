@@ -50,6 +50,7 @@ This milestone does not load the full model. It validates the physical and runti
 - [ADR-001: Select Qwen3-235B-A22B](docs/decisions/ADR-001-model-selection.md)
 - [ADR-002: Phase 0 Transport First](docs/decisions/ADR-002-phase0-transport-first.md)
 - [Cluster Setup Runbook](docs/runbooks/cluster-setup.md)
+- [Overnight Agent Work Pack](docs/work-packs/2026-07-09-overnight/README.md)
 
 ## Implementation Posture
 
@@ -62,4 +63,3 @@ Build the smallest measurable system first:
 5. Decide whether the interconnect and scheduling model justify moving toward model loading.
 
 Every benchmark must be reproducible from a command and must emit machine-readable output.
-
