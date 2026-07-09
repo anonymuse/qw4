@@ -49,39 +49,43 @@ Classification rules: `active` means still tied to an open coordination task or 
 |---|---|---|---|---|---|---|
 | `/Users/jessewhite/Code/personal/qw4` | `main` at `ebe0996` | clean | primary checkout, `origin/main` | active | Preserve as stable integration checkout. | preserve |
 | `/Users/jessewhite/.codex/worktrees/83f9/qw4` | `codex/worktree-census` from `ebe0996` | clean after census commit | current census task | active | Open draft PR if possible, then preserve until merged. | preserve |
-| `/Users/jessewhite/.codex/worktrees/13d1/qw4` | `codex/add-concurrent-transport-harness` at `b99a9d9` | clean | PR #5 merged | merged | Confirm no active thread still uses it, then prune worktree and later delete branch if desired. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/c9a3/qw4` | `codex/create-feature-backlog-docs` at `41decce` | clean | PR #6 merged | merged | Confirm no active thread still uses it, then prune worktree and later delete branch if desired. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/c0ae/qw4` | `codex/ds5-localmodel-testing-main` at `18513a7` | clean | PR #4 merged / `codex/continue-ds5-localmodel-testing` | merged | Confirm whether this branch name is still useful; prune worktree after confirmation. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/908a/qw4` | `codex/ds5-f001-pdd-topology` at `a483426` | clean | PR #8 merged from remote tip `df32794`; local branch is not an ancestor of `main` | needs-rescue | Compare local branch against merged PR #8 before cleanup; preserve until coordinator confirms no unique local patch value. | needs review |
-| `/Users/jessewhite/.codex/worktrees/bc6f/qw4` | `codex/coordination-workflow` at `22dd5c0` | clean | PR #7 merged from remote tip `2688df1`; local branch is not an ancestor of `main` | needs-rescue | Compare local branch against merged PR #7 before cleanup; preserve until coordinator confirms no unique local patch value. | needs review |
-| `/Users/jessewhite/.codex/worktrees/02dd/qw4` | detached `d9efe4e` (`backup/local-main-before-origin-sync-20260709`) | clean | backup branch not merged into `main` by ancestry | needs-rescue | Keep until backup branch purpose is reviewed against `main`; do not prune solely because it is clean. | needs review |
-| `/Users/jessewhite/.codex/worktrees/97fa/qw4` | detached `d9efe4e` (`backup/local-main-before-origin-sync-20260709`) | dirty: modified `README.md`, `tools/model_inspect/README.md`; untracked local model smoke files | local model metadata/smoke work | needs-rescue | Preserve immediately; create a branch or move useful changes only after owner review. | preserve |
-| `/Users/jessewhite/.codex/worktrees/24b4/qw4` | detached `18513a7` | clean | PR #4 merged | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/9f34/qw4` | detached `18513a7` | clean | PR #4 merged | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/baee/qw4` | detached `18513a7` | clean | PR #4 merged | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/c156/qw4` | detached `18513a7` | clean | PR #4 merged | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/4bbd/qw4` | detached `310ad6d` | clean | PR #8 merge commit, reachable from `main` | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
-| `/Users/jessewhite/.codex/worktrees/f10b/qw4` | detached `310ad6d` | clean | PR #8 merge commit, reachable from `main` | stale-clean | Confirm no active thread uses it, then prune worktree. | safe to prune after confirmation |
+| `/Users/jessewhite/.codex/worktrees/97fa/qw4` | `codex/local-model-metadata-smoke` at `2e6ff00` | clean | local GGUF metadata smoke rescue work | active | Preserve; branch contains newly rescued work and should be reviewed or PR'd separately. | preserve |
+| `/Users/jessewhite/.codex/worktrees/bc6f/qw4` | `codex/coordination-workflow` at `22dd5c0` | clean | PR #7 merged from remote tip `2688df1`; local branch still has a unique cherry-pick-visible commit | needs-rescue | Preserve until coordinator compares or intentionally abandons the local branch. | needs review |
+
+Pruned during the 2026-07-09 cleanup pass after one-at-a-time owner confirmation:
+
+| Removed path | Former state | Reason |
+|---|---|---|
+| `/Users/jessewhite/.codex/worktrees/24b4/qw4` | detached `18513a7` | Clean duplicate at merged PR #4 commit. |
+| `/Users/jessewhite/.codex/worktrees/9f34/qw4` | detached `18513a7` | Clean duplicate at merged PR #4 commit. |
+| `/Users/jessewhite/.codex/worktrees/baee/qw4` | detached `18513a7` | Clean duplicate at merged PR #4 commit. |
+| `/Users/jessewhite/.codex/worktrees/c156/qw4` | detached `18513a7` | Clean duplicate at merged PR #4 commit. |
+| `/Users/jessewhite/.codex/worktrees/4bbd/qw4` | detached `310ad6d` | Clean duplicate at merged PR #8 commit. |
+| `/Users/jessewhite/.codex/worktrees/f10b/qw4` | detached `310ad6d` | Clean duplicate at merged PR #8 commit. |
+| `/Users/jessewhite/.codex/worktrees/13d1/qw4` | `codex/add-concurrent-transport-harness` at `b99a9d9` | Clean worktree for PR #5 branch already merged by ancestry. |
+| `/Users/jessewhite/.codex/worktrees/c9a3/qw4` | `codex/create-feature-backlog-docs` at `41decce` | Clean worktree for PR #6 branch already merged by ancestry. |
+| `/Users/jessewhite/.codex/worktrees/c0ae/qw4` | `codex/ds5-localmodel-testing-main` at `18513a7` | Clean worktree for branch already merged by ancestry. |
+| `/Users/jessewhite/.codex/worktrees/02dd/qw4` | detached `d9efe4e` | Clean backup-checkout duplicate; branch pointer preserved after `97fa` was rescued. |
+| `/Users/jessewhite/.codex/worktrees/908a/qw4` | `codex/ds5-f001-pdd-topology` at `a483426` | Clean worktree; patch content appeared represented on `main` by PR #8 though branch commit was not an ancestor. |
 
 ## Active Branches Waiting For Review Or Cleanup
 
 | Branch | Status | Evidence | Next action |
 |---|---|---|---|
-| `codex/worktree-census` | active | Current docs-only census branch. | Commit active-board update and open draft PR. |
-| `codex/ds5-f001-pdd-topology` | cleanup review | PR #8 is merged, but local branch tip `a483426` differs from merged remote tip `df32794`. | Compare before deleting branch or pruning its named worktree. |
-| `codex/coordination-workflow` | cleanup review | PR #7 is merged, but local branch tip `22dd5c0` differs from merged remote tip `2688df1`. | Compare before deleting branch or pruning its named worktree. |
-| `backup/local-main-before-origin-sync-20260709` | backup review | Detached clean and dirty worktrees point at `d9efe4e`; ancestry check says not merged into `main`. | Decide whether the backup still protects useful state. |
-| `codex/add-concurrent-transport-harness` | merged cleanup | Branch tip `b99a9d9` is merged via PR #5. | Cleanup after owner confirmation. |
-| `codex/create-feature-backlog-docs` | merged cleanup | Branch tip `41decce` is merged via PR #6. | Cleanup after owner confirmation. |
-| `codex/ds5-localmodel-testing-main` | merged cleanup | Points at `18513a7`, same commit as merged PR #4 line. | Cleanup after confirming branch name is not still useful. |
+| `codex/worktree-census` | active | Current docs-only census branch and draft PR #9. | Update PR #9 with this cleanup follow-up. |
+| `codex/local-model-metadata-smoke` | active rescue | Created from formerly detached `97fa`; committed `2e6ff00` with local GGUF metadata smoke tooling. | Review, rebase if needed, then decide whether to push/PR. |
+| `codex/coordination-workflow` | cleanup review | PR #7 is merged, but local branch tip `22dd5c0` remains unique under `git log --cherry-pick main...codex/coordination-workflow`. | Compare before pruning its worktree or deleting branch. |
+| `codex/ds5-f001-pdd-topology` | branch cleanup review | Worktree was pruned after patch-equivalence review; local branch tip `a483426` still differs from merged remote tip `df32794`. | Delete branch only after separate confirmation. |
+| `backup/local-main-before-origin-sync-20260709` | backup review | Backup pointer remains at `d9efe4e`; related clean worktree was pruned after rescue branch was created. | Decide whether the backup branch is still useful. |
+| `codex/add-concurrent-transport-harness` | merged branch cleanup | Branch tip `b99a9d9` is merged via PR #5; worktree pruned. | Delete branch only after separate confirmation. |
+| `codex/create-feature-backlog-docs` | merged branch cleanup | Branch tip `41decce` is merged via PR #6; worktree pruned. | Delete branch only after separate confirmation. |
+| `codex/ds5-localmodel-testing-main` | merged branch cleanup | Points at `18513a7`, same commit as merged PR #4 line; worktree pruned. | Delete branch only after separate confirmation. |
 
 ## Stale Or Detached Worktrees Needing Owner Confirmation
 
 | Worktree set | State | Confirmation needed |
 |---|---|---|
-| Detached `18513a7`: `24b4`, `9f34`, `baee`, `c156` | clean, PR #4 merge commit | Confirm no Codex thread is still using these before pruning. |
-| Detached `310ad6d`: `4bbd`, `f10b` | clean, PR #8 merge commit | Confirm no Codex thread is still using these before pruning. |
-| Detached `d9efe4e`: `02dd`, `97fa` | backup commit; `97fa` has uncommitted changes | Review and rescue `97fa`; decide whether `02dd` is redundant only after backup review. |
+| None remaining | Current worktrees are `main`, `codex/worktree-census`, `codex/local-model-metadata-smoke`, and `codex/coordination-workflow`. | Preserve active/review worktrees until their branches are resolved. |
 
 ## Integration Queue
 
@@ -90,9 +94,9 @@ Classification rules: `active` means still tied to an open coordination task or 
 | Confirm build and test commands | all tasks | open | Keep commands in runbooks once stable. |
 | Reconcile completed seed work into current board statuses | all tasks | done | Seed rows now point at merged PR evidence or active backlog work. |
 | Decide whether to keep `docs/backlog/` as aliases only | coordination | open | `docs/backlog/README.md` is currently a real feature catalogue; keep `docs/coordination/` as the active operating board. |
-| Rescue dirty detached local-model work | `/Users/jessewhite/.codex/worktrees/97fa/qw4` | open | Dirty detached worktree has modified docs and untracked smoke tooling. Preserve until owner decides branch/commit/discard path. |
-| Review divergent local copies of merged PR branches | `codex/coordination-workflow`, `codex/ds5-f001-pdd-topology` | open | Local branch tips differ from merged remote PR tips; compare before branch cleanup. |
-| Confirm and prune clean stale worktrees | worktree census | open | Only prune after confirming no active Codex thread still uses the worktree. |
+| Rescue dirty detached local-model work | `/Users/jessewhite/.codex/worktrees/97fa/qw4` | done | Rescued to `codex/local-model-metadata-smoke` and committed as `2e6ff00`; worktree is clean. |
+| Review divergent local copies of merged PR branches | `codex/coordination-workflow`, `codex/ds5-f001-pdd-topology` | open | `codex/coordination-workflow` worktree is preserved; `codex/ds5-f001-pdd-topology` worktree was pruned but branch remains. Delete branches only after separate confirmation. |
+| Confirm and prune clean stale worktrees | worktree census | done | Confirmed one at a time and pruned redundant worktrees; no stale detached worktrees remain. |
 
 ## Coordinator Checklist
 
@@ -105,8 +109,8 @@ Classification rules: `active` means still tied to an open coordination task or 
 
 ## Next Coordinator Actions
 
-1. Review `/Users/jessewhite/.codex/worktrees/97fa/qw4` and rescue or intentionally abandon the dirty detached local-model metadata work.
-2. Compare local `codex/coordination-workflow` and `codex/ds5-f001-pdd-topology` against their merged PR tips before branch deletion.
-3. Ask owners whether detached clean worktrees at `18513a7` and `310ad6d` are still tied to live Codex threads.
-4. After confirmation, prune only clean redundant worktrees; do not remove branches until their branch cleanup has separate confirmation.
+1. Review `codex/local-model-metadata-smoke` (`2e6ff00`) and decide whether to rebase, push, and open a PR.
+2. Compare local `codex/coordination-workflow` against merged PR #7 before pruning `/Users/jessewhite/.codex/worktrees/bc6f/qw4` or deleting the branch.
+3. Decide whether preserved branch pointers such as `codex/ds5-f001-pdd-topology`, merged feature branches, and backup branches are still useful.
+4. Delete branches only after a separate branch-cleanup confirmation pass.
 5. Start any new DS5 work from `main` with one task, one branch, one worktree, and one task-board row.
