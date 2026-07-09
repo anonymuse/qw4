@@ -25,7 +25,6 @@ Existing implementation signals:
 - Artifact readiness prep is tracked in
   `docs/runbooks/ds5-f000-artifact-readiness.md`; it tightens schema/report
   validation but does not replace the required target A/B/C run.
-=======
 - The routing-payload scaffold is not target-hardware transport evidence, measured copy-count telemetry, or DS5-F002 runtime progress.
 
 ## Rigid Acceptance Criteria
@@ -66,5 +65,5 @@ partial artifacts that omit A-B/A-C latency coverage, block-size throughput
 coverage, concurrent-link rows, checksum-failure events, worker health,
 reconnect counters, scheduler overhead, or projected decode-impact formula
 inputs.
-=======
+
 - Any reading of the routing-payload scaffold or its zero-copy design budget as measured copy-count telemetry.
