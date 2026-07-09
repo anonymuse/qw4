@@ -43,6 +43,9 @@ This milestone does not load the full model. It validates the physical and runti
 ## Documentation Index
 
 - [Assumptions](docs/assumptions.md)
+- [Coordination](docs/coordination/README.md)
+- [Sustainable Workflow](docs/coordination/workflow.md)
+- [Active Board](docs/coordination/active-board.md)
 - [Documentation Reconciliation](docs/documentation-reconciliation.md)
 - [Risk Register](docs/risk-register.md)
 - [Minimum Viable Finding](docs/minimum-viable-finding.md)
