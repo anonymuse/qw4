@@ -66,6 +66,12 @@ make pdd-topology-validate
 This is scaffold/planning evidence only. It validates manifest constants and byte
 arithmetic; it does not load model weights or claim full runtime support.
 
+`configs/schemas/pdd-placement-manifest.schema.json` is a structural contract:
+required objects, field types, and no unexpected keys. The semantic authority is
+`src/model/pdd_topology.py`, which enforces the exact Qwen target constants,
+A/B/C layer ownership, memory cap arithmetic, planning-only evidence metadata,
+tensor-class policy placeholders, and Node A runtime-path constraints.
+
 ## Phase 0 Routing Payload Scaffold
 
 Validate the DS5-F000 Phase 0 routing-payload scaffold and emit a

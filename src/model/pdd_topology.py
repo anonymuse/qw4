@@ -17,7 +17,11 @@ PLACEMENT_SCHEMA_VERSION = "ds5.pdd_placement.v1"
 MEMORY_LEDGER_SCHEMA_VERSION = "ds5.pdd_memory_ledger.v1"
 FEATURE_ID = "DS5-F001"
 EVIDENCE_CLASS = "scaffold/planning"
+EXPECTED_MODEL_NAME = "Qwen3-235B-A22B"
+EXPECTED_MODEL_VARIANT = "Qwen3-235B-A22B-Instruct-2507"
 EXPECTED_MODEL_LAYERS = 94
+EXPECTED_MODEL_EXPERTS = 128
+EXPECTED_MODEL_ACTIVE_EXPERTS = 8
 EXPECTED_NODES = ("A", "B", "C")
 EXPECTED_LAYER_RANGES = {
     "A": [],
@@ -30,6 +34,37 @@ EXPECTED_RUNTIME_HEADROOM_GB = 14.4
 EXPECTED_STATIC_CAP_FRACTION = 0.70
 EXPECTED_RUNTIME_HEADROOM_FRACTION = 0.30
 FLOAT_TOLERANCE = 1e-6
+MEMORY_EVIDENCE_SCHEMA_VERSION = "ds5.pdd_memory_evidence.v1"
+BYTE_SOURCE_PLACEHOLDER_CAP_TEST = "placeholder_cap_test"
+BYTE_SOURCE_MEASURED_RUNTIME = "measured_runtime"
+BYTE_SOURCE_DERIVED_FROM_PINNED_TENSOR = "derived_from_pinned_tensor_metadata"
+ALLOWED_BYTE_SOURCE_STATES = (
+    BYTE_SOURCE_PLACEHOLDER_CAP_TEST,
+    BYTE_SOURCE_MEASURED_RUNTIME,
+    BYTE_SOURCE_DERIVED_FROM_PINNED_TENSOR,
+)
+MEMORY_BYTE_FIELDS = (
+    "nodes[].static_memory.primary_moe_decode_bytes",
+    "nodes[].static_memory.dense_decode_bytes",
+    "nodes[].static_memory.router_gate_mirror_bytes",
+    "nodes[].static_memory.other_static_bytes",
+    "nodes[].static_memory.total_static_bytes",
+)
+CONTEXT_EVIDENCE_CLASS = "planning_only"
+EXPECTED_FIRST_PERFORMANCE_CONTEXT_MIN_TOKENS = 8_192
+EXPECTED_FIRST_PERFORMANCE_CONTEXT_MAX_TOKENS = 32_768
+EXPECTED_STRETCH_CONTEXT_TOKENS = 65_536
+EXPECTED_RESEARCH_ONLY_CONTEXT_MIN_TOKENS = 131_072
+EXPECTED_RESEARCH_ONLY_CONTEXT_MAX_TOKENS = 262_144
+TENSOR_POLICY_EVIDENCE_CLASS = "placeholder/planning"
+EXPECTED_TENSOR_CLASS_POLICY_KEYS = (
+    "router_gate",
+    "attention",
+    "hot_moe_experts",
+    "cold_moe_experts",
+    "kv_cache",
+)
+NODE_A_STEADY_STATE_CONSTRAINT = "forbidden_outside_correctness_mode"
 
 
 class PlacementValidationError(ValueError):
@@ -58,7 +93,20 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
     _require_equal(manifest.get("feature_id"), FEATURE_ID, "feature_id")
 
     model = _required_mapping(manifest, "model", "root")
-    _require_equal(model.get("layers"), EXPECTED_MODEL_LAYERS, "model.layers")
+    _validate_model(model)
+
+    evidence_metadata = _required_mapping(manifest, "evidence_metadata", "root")
+    memory_accounting = _validate_evidence_metadata(evidence_metadata)
+
+    context_length_assumption = _validate_context_length_assumption(
+        _required_mapping(manifest, "context_length_assumption", "root")
+    )
+    tensor_class_policy_placeholders = _validate_tensor_class_policy_placeholders(
+        _required_mapping(manifest, "tensor_class_policy_placeholders", "root")
+    )
+    runtime_path_constraints = _validate_runtime_path_constraints(
+        _required_mapping(manifest, "runtime_path_constraints", "root")
+    )
 
     limits = _required_mapping(manifest, "limits", "root")
     _validate_limits(limits)
@@ -74,7 +122,7 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
 
     nodes = _required_list(manifest, "nodes", "root")
     nodes_by_name = _index_nodes(nodes)
-    ledger_nodes = [_validate_node(nodes_by_name[name]) for name in EXPECTED_NODES]
+    ledger_nodes = [_validate_node(nodes_by_name[name], memory_accounting) for name in EXPECTED_NODES]
     _validate_layer_coverage(ledger_nodes)
 
     return {
@@ -82,11 +130,11 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
         "feature_id": FEATURE_ID,
         "source_manifest": manifest_path,
         "model": {
-            "name": model.get("name"),
-            "variant": model.get("variant"),
-            "layers": model.get("layers"),
-            "experts": model.get("experts"),
-            "active_experts": model.get("active_experts"),
+            "name": EXPECTED_MODEL_NAME,
+            "variant": EXPECTED_MODEL_VARIANT,
+            "layers": EXPECTED_MODEL_LAYERS,
+            "experts": EXPECTED_MODEL_EXPERTS,
+            "active_experts": EXPECTED_MODEL_ACTIVE_EXPERTS,
         },
         "limits": {
             "byte_unit": "decimal_gb",
@@ -104,6 +152,7 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
             "class": EVIDENCE_CLASS,
             "measured_full_runtime": False,
             "source": "placement manifest constants and validator arithmetic",
+            "memory_accounting": memory_accounting,
             "not_measured": [
                 "Qwen model weights",
                 "tokenizer assets",
@@ -114,23 +163,37 @@ def build_memory_ledger(manifest: dict[str, Any], *, manifest_path: str | None =
                 "startup, warmup, or decode runtime memory",
             ],
         },
+        "context_length_assumption": context_length_assumption,
+        "tensor_class_policy_placeholders": tensor_class_policy_placeholders,
+        "runtime_path_constraints": runtime_path_constraints,
         "nodes": ledger_nodes,
         "validation": {
             "status": "pass",
             "checked_invariants": [
+                "Qwen3-235B-A22B Instruct model identity constants",
                 "exact A/B/C node set",
                 "Node A owns 0 primary MoE decode bytes",
                 "Node B owns inclusive decode layers 0-46",
                 "Node C owns inclusive decode layers 47-93",
                 "48GB workers keep 30% memory headroom",
                 "48GB workers stay at or below a 33.6GB static cap",
+                "memory byte evidence is machine-readable placeholder cap-test metadata",
+                "context-length assumption is planning-only metadata",
+                "tensor-class policy placeholders are present and not runtime implemented",
+                "Node A is off the steady-state decode critical path outside correctness mode",
             ],
             "checked_claims": [
+                _claim(
+                    "Model constants match Qwen3-235B-A22B-Instruct-2507 with "
+                    "94 layers, 128 experts, and 8 active experts"
+                ),
                 _claim("Node A primary MoE decode bytes are exactly 0"),
                 _claim("Node B owns inclusive decode layers 0-46"),
                 _claim("Node C owns inclusive decode layers 47-93"),
                 _claim("Node B stays under the 33.6GB static cap and preserves 14.4GB runtime headroom"),
                 _claim("Node C stays under the 33.6GB static cap and preserves 14.4GB runtime headroom"),
+                _claim("Memory byte buckets are placeholder cap-test bytes, not measured or pinned-tensor-derived bytes"),
+                _claim("Node A is forbidden from the steady-state decode critical path outside correctness mode"),
             ],
         },
         "limits_of_claim": list(manifest.get("limits_of_claim", [])),
@@ -150,9 +213,16 @@ def write_finding_summary(ledger: dict[str, Any], path: str | Path) -> None:
 
 
 def format_ledger_summary(ledger: dict[str, Any]) -> str:
+    memory_accounting = ledger["evidence"]["memory_accounting"]
     lines = [
         f"{FEATURE_ID} PDD topology manifest: PASS",
         f"Evidence: {ledger['evidence']['class']} (measured full runtime: no)",
+        f"Memory bytes: {memory_accounting['byte_source_state']} "
+        f"(measured runtime: {str(memory_accounting['measured_runtime']).lower()}, "
+        f"pinned tensor derived: {str(memory_accounting['derived_from_pinned_tensor_metadata']).lower()})",
+        f"Context assumption: {ledger['context_length_assumption']['evidence_class']}",
+        f"Node A steady-state decode path: "
+        f"{ledger['runtime_path_constraints']['node_a_steady_state_decode_critical_path']}",
         "",
         "Node  Layers    Primary MoE decode  Static total  Static cap  Static margin  Runtime headroom  Result",
     ]
@@ -181,6 +251,9 @@ def format_ledger_summary(ledger: dict[str, Any]) -> str:
 
 def format_finding_summary(ledger: dict[str, Any]) -> str:
     nodes = {node["name"]: node for node in ledger["nodes"]}
+    memory_accounting = ledger["evidence"]["memory_accounting"]
+    context_assumption = ledger["context_length_assumption"]
+    runtime_constraints = ledger["runtime_path_constraints"]
     lines = [
         "# DS5-F001 PDD Topology Acceptance Summary",
         "",
@@ -204,6 +277,15 @@ def format_finding_summary(ledger: dict[str, Any]) -> str:
         f"| Evidence class | `{ledger['evidence']['class']}` |",
         f"| Measured full runtime | `{str(ledger['evidence']['measured_full_runtime']).lower()}` |",
         f"| Evidence source | {ledger['evidence']['source']} |",
+        f"| Memory byte source state | `{memory_accounting['byte_source_state']}` |",
+        f"| Placeholder cap-test bytes | `{str(memory_accounting['placeholder_cap_test']).lower()}` |",
+        f"| Measured runtime bytes | `{str(memory_accounting['measured_runtime']).lower()}` |",
+        f"| Derived from pinned tensor metadata | `{str(memory_accounting['derived_from_pinned_tensor_metadata']).lower()}` |",
+        f"| Context assumption evidence | `{context_assumption['evidence_class']}` |",
+        (
+            "| Node A steady-state decode critical path | "
+            f"`{runtime_constraints['node_a_steady_state_decode_critical_path']}` |"
+        ),
         "",
         "This summary validates placement-manifest constants and memory-budget arithmetic only. It does not "
         "load Qwen weights, tokenizer assets, a speculative drafter, a primary-weight loader, a KV allocator, "
@@ -213,6 +295,14 @@ def format_finding_summary(ledger: dict[str, Any]) -> str:
         "",
         "| Claim | Ledger evidence | Result | Evidence class |",
         "|---|---|---:|---|",
+        (
+            "| Model constants match Qwen3-235B-A22B-Instruct-2507 "
+            f"| `layers = {ledger['model']['layers']}`; "
+            f"`experts = {ledger['model']['experts']}`; "
+            f"`active_experts = {ledger['model']['active_experts']}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
         (
             "| Node A primary MoE decode bytes are exactly 0 "
             f"| `nodes.A.primary_moe_decode_bytes = {nodes['A']['primary_moe_decode_bytes']}` "
@@ -245,11 +335,27 @@ def format_finding_summary(ledger: dict[str, Any]) -> str:
             "| PASS "
             f"| `{EVIDENCE_CLASS}` |"
         ),
+        (
+            "| Memory byte buckets are placeholder cap-test bytes "
+            f"| `byte_source_state = {memory_accounting['byte_source_state']}`; "
+            f"`measured_runtime = {str(memory_accounting['measured_runtime']).lower()}`; "
+            f"`derived_from_pinned_tensor_metadata = "
+            f"{str(memory_accounting['derived_from_pinned_tensor_metadata']).lower()}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
+        (
+            "| Node A stays off the steady-state decode critical path outside correctness mode "
+            "| `node_a_steady_state_decode_critical_path = "
+            f"{runtime_constraints['node_a_steady_state_decode_critical_path']}` "
+            "| PASS "
+            f"| `{EVIDENCE_CLASS}` |"
+        ),
         "",
         "## Memory Ledger Summary",
         "",
-        "| Node | Decode layers | Primary MoE decode bytes | Static total | Static cap | Static margin | Runtime headroom | Evidence class |",
-        "|---|---|---:|---:|---:|---:|---:|---|",
+        "| Node | Decode layers | Primary MoE decode bytes | Static total | Static cap | Static margin | Runtime headroom | Byte source state | Evidence class |",
+        "|---|---|---:|---:|---:|---:|---:|---|---|",
     ]
 
     for node in ledger["nodes"]:
@@ -261,11 +367,66 @@ def format_finding_summary(ledger: dict[str, Any]) -> str:
             f"| {_fmt_gb(node['static_cap_bytes'])} "
             f"| {_fmt_gb(node['static_headroom_bytes'])} "
             f"| {_fmt_gb(node['runtime_headroom_bytes'])} "
+            f"| `{node['byte_source_state']}` "
             f"| `{node['evidence_class']}` |"
         )
 
     lines.extend(
         [
+            "",
+            "## Planning Assumptions",
+            "",
+            "| Field | Value |",
+            "|---|---|",
+            f"| Context evidence class | `{context_assumption['evidence_class']}` |",
+            f"| Runtime validated | `{str(context_assumption['runtime_validated']).lower()}` |",
+            (
+                "| First performance context tokens | "
+                f"`{context_assumption['first_performance_context_tokens']['min']}`-"
+                f"`{context_assumption['first_performance_context_tokens']['max']}` |"
+            ),
+            f"| Stretch context tokens | `{context_assumption['stretch_context_tokens']}` |",
+            (
+                "| Research-only context tokens | "
+                f"`{context_assumption['research_only_context_tokens']['min']}`-"
+                f"`{context_assumption['research_only_context_tokens']['max']}` |"
+            ),
+            "",
+            "## Tensor-Class Policy Placeholders",
+            "",
+            "| Tensor class | Runtime implemented | Policy placeholder |",
+            "|---|---:|---|",
+        ]
+    )
+    for key in EXPECTED_TENSOR_CLASS_POLICY_KEYS:
+        policy = ledger["tensor_class_policy_placeholders"][key]
+        lines.append(
+            f"| `{key}` | `{str(policy['runtime_implemented']).lower()}` | {policy['policy']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Runtime Path Constraints",
+            "",
+            "| Constraint | Value |",
+            "|---|---|",
+            (
+                "| Node A steady-state decode critical path | "
+                f"`{runtime_constraints['node_a_steady_state_decode_critical_path']}` |"
+            ),
+            (
+                "| Correctness-mode Node A routing allowed | "
+                f"`{str(runtime_constraints['correctness_mode_node_a_routing_allowed']).lower()}` |"
+            ),
+            (
+                "| Performance mode requires B/C local router mirrors | "
+                f"`{str(runtime_constraints['performance_mode_requires_bc_local_router_mirrors']).lower()}` |"
+            ),
+            (
+                "| Steady-state decode runtime implemented | "
+                f"`{str(runtime_constraints['steady_state_decode_runtime_implemented']).lower()}` |"
+            ),
             "",
             "## Limits Of Claim",
             "",
@@ -275,6 +436,272 @@ def format_finding_summary(ledger: dict[str, Any]) -> str:
         lines.append(f"- {limit}")
     lines.append("")
     return "\n".join(lines)
+
+
+def _validate_model(model: dict[str, Any]) -> None:
+    _require_equal(model.get("name"), EXPECTED_MODEL_NAME, "model.name")
+    _require_equal(model.get("variant"), EXPECTED_MODEL_VARIANT, "model.variant")
+    _require_equal(model.get("layers"), EXPECTED_MODEL_LAYERS, "model.layers")
+    _require_equal(model.get("experts"), EXPECTED_MODEL_EXPERTS, "model.experts")
+    _require_equal(
+        model.get("active_experts"),
+        EXPECTED_MODEL_ACTIVE_EXPERTS,
+        "model.active_experts",
+    )
+
+
+def _validate_evidence_metadata(evidence_metadata: dict[str, Any]) -> dict[str, Any]:
+    _require_equal(
+        evidence_metadata.get("schema_version"),
+        MEMORY_EVIDENCE_SCHEMA_VERSION,
+        "evidence_metadata.schema_version",
+    )
+    memory_accounting = _required_mapping(evidence_metadata, "memory_accounting", "evidence_metadata")
+    byte_source_state = _required_string(
+        memory_accounting,
+        "byte_source_state",
+        "evidence_metadata.memory_accounting",
+    )
+    if byte_source_state not in ALLOWED_BYTE_SOURCE_STATES:
+        raise PlacementValidationError(
+            "evidence_metadata.memory_accounting.byte_source_state must be one of "
+            f"{list(ALLOWED_BYTE_SOURCE_STATES)!r}"
+        )
+    allowed_states = _required_string_list(
+        memory_accounting,
+        "allowed_byte_source_states",
+        "evidence_metadata.memory_accounting",
+    )
+    if tuple(allowed_states) != ALLOWED_BYTE_SOURCE_STATES:
+        raise PlacementValidationError(
+            "evidence_metadata.memory_accounting.allowed_byte_source_states must be "
+            f"{list(ALLOWED_BYTE_SOURCE_STATES)!r}"
+        )
+    applies_to_fields = _required_string_list(
+        memory_accounting,
+        "applies_to_fields",
+        "evidence_metadata.memory_accounting",
+    )
+    if tuple(applies_to_fields) != MEMORY_BYTE_FIELDS:
+        raise PlacementValidationError(
+            "evidence_metadata.memory_accounting.applies_to_fields must enumerate static memory byte fields"
+        )
+    placeholder_cap_test = _required_bool(
+        memory_accounting,
+        "placeholder_cap_test",
+        "evidence_metadata.memory_accounting",
+    )
+    measured_runtime = _required_bool(
+        memory_accounting,
+        "measured_runtime",
+        "evidence_metadata.memory_accounting",
+    )
+    derived_from_pinned_tensor_metadata = _required_bool(
+        memory_accounting,
+        "derived_from_pinned_tensor_metadata",
+        "evidence_metadata.memory_accounting",
+    )
+    if byte_source_state == BYTE_SOURCE_PLACEHOLDER_CAP_TEST:
+        if not placeholder_cap_test or measured_runtime or derived_from_pinned_tensor_metadata:
+            raise PlacementValidationError(
+                "placeholder cap-test bytes must set placeholder_cap_test=true and "
+                "measured_runtime=false and derived_from_pinned_tensor_metadata=false"
+            )
+    elif byte_source_state == BYTE_SOURCE_MEASURED_RUNTIME:
+        if placeholder_cap_test or not measured_runtime or derived_from_pinned_tensor_metadata:
+            raise PlacementValidationError(
+                "measured runtime bytes must set measured_runtime=true only"
+            )
+    elif byte_source_state == BYTE_SOURCE_DERIVED_FROM_PINNED_TENSOR:
+        if placeholder_cap_test or measured_runtime or not derived_from_pinned_tensor_metadata:
+            raise PlacementValidationError(
+                "pinned tensor derived bytes must set derived_from_pinned_tensor_metadata=true only"
+            )
+    source_detail = _required_string(
+        memory_accounting,
+        "source_detail",
+        "evidence_metadata.memory_accounting",
+    )
+    return {
+        "schema_version": MEMORY_EVIDENCE_SCHEMA_VERSION,
+        "byte_source_state": byte_source_state,
+        "allowed_byte_source_states": list(ALLOWED_BYTE_SOURCE_STATES),
+        "applies_to_fields": list(MEMORY_BYTE_FIELDS),
+        "placeholder_cap_test": placeholder_cap_test,
+        "measured_runtime": measured_runtime,
+        "derived_from_pinned_tensor_metadata": derived_from_pinned_tensor_metadata,
+        "source_detail": source_detail,
+    }
+
+
+def _validate_context_length_assumption(context: dict[str, Any]) -> dict[str, Any]:
+    _require_equal(
+        context.get("evidence_class"),
+        CONTEXT_EVIDENCE_CLASS,
+        "context_length_assumption.evidence_class",
+    )
+    runtime_validated = _required_bool(context, "runtime_validated", "context_length_assumption")
+    if runtime_validated:
+        raise PlacementValidationError("context_length_assumption.runtime_validated must be false")
+    first_performance = _required_mapping(
+        context,
+        "first_performance_context_tokens",
+        "context_length_assumption",
+    )
+    _require_equal(
+        _required_nonnegative_int(
+            first_performance,
+            "min",
+            "context_length_assumption.first_performance_context_tokens",
+        ),
+        EXPECTED_FIRST_PERFORMANCE_CONTEXT_MIN_TOKENS,
+        "context_length_assumption.first_performance_context_tokens.min",
+    )
+    _require_equal(
+        _required_nonnegative_int(
+            first_performance,
+            "max",
+            "context_length_assumption.first_performance_context_tokens",
+        ),
+        EXPECTED_FIRST_PERFORMANCE_CONTEXT_MAX_TOKENS,
+        "context_length_assumption.first_performance_context_tokens.max",
+    )
+    stretch_context_tokens = _required_nonnegative_int(
+        context,
+        "stretch_context_tokens",
+        "context_length_assumption",
+    )
+    _require_equal(
+        stretch_context_tokens,
+        EXPECTED_STRETCH_CONTEXT_TOKENS,
+        "context_length_assumption.stretch_context_tokens",
+    )
+    research_only = _required_mapping(
+        context,
+        "research_only_context_tokens",
+        "context_length_assumption",
+    )
+    _require_equal(
+        _required_nonnegative_int(
+            research_only,
+            "min",
+            "context_length_assumption.research_only_context_tokens",
+        ),
+        EXPECTED_RESEARCH_ONLY_CONTEXT_MIN_TOKENS,
+        "context_length_assumption.research_only_context_tokens.min",
+    )
+    _require_equal(
+        _required_nonnegative_int(
+            research_only,
+            "max",
+            "context_length_assumption.research_only_context_tokens",
+        ),
+        EXPECTED_RESEARCH_ONLY_CONTEXT_MAX_TOKENS,
+        "context_length_assumption.research_only_context_tokens.max",
+    )
+    source = _required_string(context, "source", "context_length_assumption")
+    return {
+        "evidence_class": CONTEXT_EVIDENCE_CLASS,
+        "runtime_validated": False,
+        "first_performance_context_tokens": {
+            "min": EXPECTED_FIRST_PERFORMANCE_CONTEXT_MIN_TOKENS,
+            "max": EXPECTED_FIRST_PERFORMANCE_CONTEXT_MAX_TOKENS,
+        },
+        "stretch_context_tokens": EXPECTED_STRETCH_CONTEXT_TOKENS,
+        "research_only_context_tokens": {
+            "min": EXPECTED_RESEARCH_ONLY_CONTEXT_MIN_TOKENS,
+            "max": EXPECTED_RESEARCH_ONLY_CONTEXT_MAX_TOKENS,
+        },
+        "source": source,
+    }
+
+
+def _validate_tensor_class_policy_placeholders(policies: dict[str, Any]) -> dict[str, Any]:
+    keys = tuple(policies.keys())
+    if keys != EXPECTED_TENSOR_CLASS_POLICY_KEYS:
+        raise PlacementValidationError(
+            "tensor_class_policy_placeholders must contain exactly "
+            f"{list(EXPECTED_TENSOR_CLASS_POLICY_KEYS)!r}"
+        )
+    validated: dict[str, Any] = {}
+    for key in EXPECTED_TENSOR_CLASS_POLICY_KEYS:
+        policy = _required_mapping(policies, key, "tensor_class_policy_placeholders")
+        _require_equal(
+            policy.get("evidence_class"),
+            TENSOR_POLICY_EVIDENCE_CLASS,
+            f"tensor_class_policy_placeholders.{key}.evidence_class",
+        )
+        runtime_implemented = _required_bool(
+            policy,
+            "runtime_implemented",
+            f"tensor_class_policy_placeholders.{key}",
+        )
+        if runtime_implemented:
+            raise PlacementValidationError(
+                f"tensor_class_policy_placeholders.{key}.runtime_implemented must be false"
+            )
+        validated[key] = {
+            "evidence_class": TENSOR_POLICY_EVIDENCE_CLASS,
+            "runtime_implemented": False,
+            "policy": _required_string(
+                policy,
+                "policy",
+                f"tensor_class_policy_placeholders.{key}",
+            ),
+            "notes": _required_string_list(
+                policy,
+                "notes",
+                f"tensor_class_policy_placeholders.{key}",
+            ),
+        }
+    return validated
+
+
+def _validate_runtime_path_constraints(constraints: dict[str, Any]) -> dict[str, Any]:
+    _require_equal(
+        constraints.get("node_a_steady_state_decode_critical_path"),
+        NODE_A_STEADY_STATE_CONSTRAINT,
+        "runtime_path_constraints.node_a_steady_state_decode_critical_path",
+    )
+    correctness_mode_allowed = _required_bool(
+        constraints,
+        "correctness_mode_node_a_routing_allowed",
+        "runtime_path_constraints",
+    )
+    if not correctness_mode_allowed:
+        raise PlacementValidationError(
+            "runtime_path_constraints.correctness_mode_node_a_routing_allowed must be true"
+        )
+    bc_local_router_mirrors = _required_bool(
+        constraints,
+        "performance_mode_requires_bc_local_router_mirrors",
+        "runtime_path_constraints",
+    )
+    if not bc_local_router_mirrors:
+        raise PlacementValidationError(
+            "runtime_path_constraints.performance_mode_requires_bc_local_router_mirrors must be true"
+        )
+    steady_state_decode_runtime_implemented = _required_bool(
+        constraints,
+        "steady_state_decode_runtime_implemented",
+        "runtime_path_constraints",
+    )
+    if steady_state_decode_runtime_implemented:
+        raise PlacementValidationError(
+            "runtime_path_constraints.steady_state_decode_runtime_implemented must be false"
+        )
+    node_a_allowed_roles = _required_string_list(
+        constraints,
+        "node_a_allowed_decode_roles",
+        "runtime_path_constraints",
+    )
+    return {
+        "node_a_steady_state_decode_critical_path": NODE_A_STEADY_STATE_CONSTRAINT,
+        "correctness_mode_node_a_routing_allowed": True,
+        "performance_mode_requires_bc_local_router_mirrors": True,
+        "steady_state_decode_runtime_implemented": False,
+        "node_a_allowed_decode_roles": node_a_allowed_roles,
+    }
 
 
 def _validate_limits(limits: dict[str, Any]) -> None:
@@ -314,7 +741,7 @@ def _index_nodes(nodes: list[Any]) -> dict[str, dict[str, Any]]:
     return indexed
 
 
-def _validate_node(node: dict[str, Any]) -> dict[str, Any]:
+def _validate_node(node: dict[str, Any], memory_accounting: dict[str, Any]) -> dict[str, Any]:
     name = str(node["name"])
     memory_gb = _required_number(node, "memory_gb", f"node {name}")
     static_cap_gb = _required_number(node, "static_cap_gb", f"node {name}")
@@ -406,6 +833,15 @@ def _validate_node(node: dict[str, Any]) -> dict[str, Any]:
         "static_headroom_bytes": static_cap_bytes - total_static_bytes,
         "passes_static_cap": total_static_bytes <= static_cap_bytes,
         "passes_runtime_headroom": passes_runtime_headroom,
+        "byte_source_state": memory_accounting["byte_source_state"],
+        "memory_accounting": {
+            "byte_source_state": memory_accounting["byte_source_state"],
+            "placeholder_cap_test": memory_accounting["placeholder_cap_test"],
+            "measured_runtime": memory_accounting["measured_runtime"],
+            "derived_from_pinned_tensor_metadata": memory_accounting[
+                "derived_from_pinned_tensor_metadata"
+            ],
+        },
         "evidence_class": EVIDENCE_CLASS,
         "measured_full_runtime": False,
         "notes": list(node.get("notes", [])),
@@ -475,6 +911,16 @@ def _required_string(data: dict[str, Any], key: str, parent: str) -> str:
     if not isinstance(value, str) or not value:
         raise PlacementValidationError(f"{parent}: missing string {key!r}")
     return value
+
+
+def _required_string_list(data: dict[str, Any], key: str, parent: str) -> list[str]:
+    values = _required_list(data, key, parent)
+    strings: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            raise PlacementValidationError(f"{parent}: {key} must contain non-empty strings")
+        strings.append(value)
+    return strings
 
 
 def _required_nonnegative_int(data: dict[str, Any], key: str, parent: str) -> int:
