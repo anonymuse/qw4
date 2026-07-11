@@ -13,6 +13,29 @@ The checked-in fixture under `tests/fixtures/artifacts/transport-smoke/` validat
 the artifact contract and represents protocol/artifact plumbing only. It must not
 be read as Thunderbolt, RDMA-style, or multi-host performance data.
 
+## 2026-07-09 Local Artifact Rehearsal
+
+Branch: `codex/ds5-f000-local-artifact-rehearsal`.
+
+Scope: MacBook-only fixture/report rehearsal for DS5-F000 artifact readiness. No
+target A/B/C cluster run was attempted, no transport path was confirmed, and no
+runtime placement, model loading, tokenizer, fused routing, prefetch, Metal, or
+performance evidence was produced.
+
+Validation results:
+
+| Command | Result | Local-only interpretation |
+|---|---:|---|
+| `python3 tools/report/validate_run.py tests/fixtures/artifacts/transport-smoke` | PASS | Fixture conforms to `phase0.artifacts.v1`. |
+| `python3 tools/report/summarize_phase0.py tests/fixtures/artifacts/transport-smoke` | PASS | Summary reports `Validity` as `loopback-only`. |
+| `make test` | PASS | 49 tests passed, including report overclaim guardrails. |
+| `git diff --check` | PASS | No whitespace errors in the working diff at rehearsal time. |
+
+Report guardrail added in this rehearsal: remote expert-rate sensitivity rows
+are now introduced as transport-derived upper-bound simulations, not final model
+throughput claims. For non-hardware-interpretable runs, the summary also says to
+treat those values as report-plumbing signals only.
+
 ## Local Modes
 
 | Mode | Meaning | Hardware interpretable |

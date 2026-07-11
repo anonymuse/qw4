@@ -32,16 +32,24 @@ python3 tools/report/summarize_phase0.py artifacts/runs/<run-id> > artifacts/run
 ## What The Summary Surfaces
 
 - run identity and scenario;
-- hardware or loopback transport path;
+- hardware, loopback, or non-interpretable transport path;
+- validity level as `hardware-cluster`, `loopback-only`, `not hardware-interpretable`, or `invalid`;
 - artifact completeness;
 - why loopback results are not hardware-cluster claims;
 - latency percentiles by message size;
 - throughput by block size;
 - checksum failures;
 - coordinator or scheduler overhead when present;
-- remote expert-rate sensitivity when present;
+- remote expert-rate sensitivity when present, explicitly labeled as a
+  transport-derived upper bound rather than final model throughput;
 - health, retry, reconnect, and failure event counts;
 - go/no-go decision when present.
+
+`hardware-cluster` is reported only when the artifact marks the run as
+hardware-interpretable, uses `scenario.kind = real_cluster`, and records a
+confirmed non-local network path. Local fixture, loopback, and localhost rows
+remain scaffold/report-plumbing signals even when they contain complete latency,
+throughput, scheduler, and projected decode-impact fields.
 
 ## Fields Needed From Schemas
 
