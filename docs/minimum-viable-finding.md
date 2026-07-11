@@ -6,11 +6,11 @@ Backlog tracking: [DS5-F000 Phase 0 Transport Finding](backlog/feature-000-phase
 
 ## Sharp Question
 
-Can an M5 Pro coordinator coordinate Qwen3-shaped MoE activation/result movement across two M5 Max workers without interconnect and scheduling overhead dominating decode-shaped work?
+Can an M5 Pro orchestrator agent keep two M5 Max synthetic LLM data-plane workers fed with Qwen3-shaped activation/result traffic without transport, scheduling, or control-plane overhead dominating decode-shaped work?
 
 ## Why This Is The First Finding
 
-The full model does not need to be loaded to test the first hard dependency: physical transfer and orchestration cost.
+The full model does not need to be loaded to test the first hard dependency: physical transfer, orchestration, and control-plane cost.
 
 If transport and scheduling fail under synthetic Qwen-shaped traffic, full transformer work should stop or pivot. If they pass, the project earns the right to proceed toward metadata inspection, placement simulation, and worker runtime prototypes.
 
@@ -18,6 +18,8 @@ If transport and scheduling fail under synthetic Qwen-shaped traffic, full trans
 
 The milestone simulates:
 
+- Node A as coordinator/orchestrator, benchmark controller, and control plane;
+- Nodes B and C as synthetic LLM data-plane workers;
 - 94 layers;
 - hidden size 4096;
 - top-8 selected experts per MoE layer;
@@ -35,8 +37,16 @@ The milestone does not implement:
 - actual expert matmul;
 - real Qwen weights;
 - quantized model loading;
+- KV allocator or real long-context management;
 - speculative decoding;
+- fused routing;
+- Metal kernels;
 - tool-call decoding.
+
+Model-independent SSD/NVMe measurements are allowed only as separate adjunct
+evidence for future cold backing, promotion, artifacts, or long-context backing.
+They do not decide the Phase 0 go/no-go unless a separate storage-readiness task
+is created and labeled independently.
 
 ## Proposed Commands
 
@@ -61,7 +71,8 @@ zig build run-coordinator -- \
   --out artifacts/runs/transport-smoke
 ```
 
-These commands are target commands for the first coding milestone; they are not implemented yet.
+For the full target-hardware operator sequence, use
+[DS5-F000 Cluster Operator Packet](runbooks/ds5-f000-cluster-operator-packet.md).
 
 ## Required Output
 
@@ -83,6 +94,7 @@ Required metrics:
 - sustained throughput by block size;
 - checksum failures;
 - scheduler overhead per simulated token;
+- control-plane overhead per simulated token;
 - bytes sent per simulated token;
 - per-layer simulated transport time;
 - concurrent A-B and A-C link interference;

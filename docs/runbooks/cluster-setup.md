@@ -12,9 +12,9 @@ The first runbook objective is to replace planning assumptions with measured tra
 
 | Label | Hardware | Role |
 |---|---|---|
-| A | MacBook Pro M5 Pro, 48GB UMA | Coordinator |
-| B | MacBook Pro M5 Max, 48GB UMA | Worker 1 |
-| C | MacBook Pro M5 Max, 48GB UMA | Worker 2 |
+| A | MacBook Pro M5 Pro, 48GB UMA | Coordinator/orchestrator/control plane |
+| B | MacBook Pro M5 Max, 48GB UMA | Synthetic LLM data-plane worker |
+| C | MacBook Pro M5 Max, 48GB UMA | Synthetic LLM data-plane worker |
 
 Optional support nodes must not carry core model weights unless a later ADR gives a narrow reason.
 
@@ -31,7 +31,8 @@ Optional support nodes must not carry core model weights unless a later ADR give
 ## Phase 0 Measurements
 
 Use [DS5-F000 Artifact Readiness](ds5-f000-artifact-readiness.md) for the
-prep-only validator checklist and the exact target A/B/C command sequence.
+prep-only validator checklist and [DS5-F000 Cluster Operator Packet](ds5-f000-cluster-operator-packet.md)
+for the exact target A/B/C command sequence.
 
 Measure the following before runtime claims:
 

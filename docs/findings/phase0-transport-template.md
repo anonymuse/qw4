@@ -4,14 +4,15 @@ Status: template. Fill from real Phase 0 run artifacts only.
 
 Use this template for the first DS5 technical finding:
 
-> Can an M5 Pro coordinator coordinate Qwen3-shaped MoE activation/result movement across two M5 Max workers without interconnect and scheduling overhead dominating decode-shaped work?
+> Can an M5 Pro orchestrator agent keep two M5 Max synthetic LLM data-plane workers fed with Qwen3-shaped activation/result traffic without transport, scheduling, or control-plane overhead dominating decode-shaped work?
 
 This template must support positive, negative, and invalid runs. Do not fill placeholders with estimates unless the section explicitly asks for a planning assumption.
 
 ## Publication Guardrails
 
 - This finding is about transport, scheduling, checksums, and simulated MoE traffic.
-- This finding does not load Qwen3 weights, run tokenizer or attention, execute expert matmuls, or measure final model quality.
+- This finding does not load Qwen3 weights, run tokenizer or attention, allocate KV cache pages, execute expert matmuls, or measure final model quality.
+- SSD/NVMe measurements are separate adjunct evidence unless a storage-readiness task explicitly scopes them into a later finding.
 - Loopback, single-host, Wi-Fi fallback, or synthetic-only results are not hardware-cluster claims.
 - Positive results justify the next investigation. They are not final model performance claims.
 - Negative results are publishable when the artifacts make the limiting factor clear.
@@ -56,9 +57,9 @@ Out of scope for this finding:
 
 | Node | Role | Host label | Hardware | Memory | OS | Transport address | Notes |
 |---|---|---|---|---:|---|---|---|
-| A | Coordinator | `[label]` | `[M5 Pro MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[power mode, clock sync, background load]` |
-| B | Worker 1 | `[label]` | `[M5 Max MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[link notes]` |
-| C | Worker 2 | `[label]` | `[M5 Max MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[link notes]` |
+| A | Coordinator/orchestrator | `[label]` | `[M5 Pro MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[power mode, clock sync, background load]` |
+| B | Synthetic LLM data-plane worker | `[label]` | `[M5 Max MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[link notes]` |
+| C | Synthetic LLM data-plane worker | `[label]` | `[M5 Max MacBook Pro]` | `[48GB]` | `[version]` | `[address]` | `[link notes]` |
 
 Transport path verification:
 
@@ -128,6 +129,7 @@ Interpretation:
 | Metric | Value | Evidence |
 |---|---:|---|
 | Scheduler overhead per simulated token | `[duration]` | `[run.json or events]` |
+| Control-plane overhead per simulated token | `[duration or scheduler proxy]` | `[run.json or events]` |
 | Scheduler overhead as share of transfer time | `[percent]` | `[calculation source]` |
 | Bytes sent per simulated token | `[bytes]` | `[scenario summary]` |
 | Per-layer simulated transport time | `[duration]` | `[scenario summary]` |

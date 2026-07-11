@@ -12,9 +12,16 @@ Governing baseline: [Minimum Viable Finding](../minimum-viable-finding.md), [ADR
 
 ## Technical Scope
 
-Measure whether the DS5 A/B/C topology can move synthetic Qwen-shaped activation/result packets without transport and coordinator scheduling overhead dominating decode-shaped work.
+Measure whether the DS5 A/B/C topology can move synthetic Qwen-shaped activation/result packets while Node A acts as the M5 Pro orchestrator/control plane and Nodes B/C act as M5 Max synthetic LLM data-plane workers.
+
+The refined Phase 0 question is:
+
+> Can an M5 Pro orchestrator agent keep two M5 Max synthetic LLM data-plane workers fed with Qwen3-shaped activation/result traffic without transport, scheduling, or control-plane overhead dominating decode-shaped work?
 
 This feature uses simulated MoE traffic. It does not load Qwen weights, run tokenizer assets, implement speculative decoding, allocate KV cache pages, or execute Metal kernels.
+It also does not make active SSD/NVMe decode-path claims. Model-independent
+storage measurements may be collected only as separate adjunct evidence for
+future cold backing, promotion, artifact movement, or long-context backing.
 
 Existing implementation signals:
 
@@ -25,6 +32,10 @@ Existing implementation signals:
 - Artifact readiness prep is tracked in
   `docs/runbooks/ds5-f000-artifact-readiness.md`; it tightens schema/report
   validation but does not replace the required target A/B/C run.
+- The target-hardware operator sequence is tracked in
+  `docs/runbooks/ds5-f000-cluster-operator-packet.md`; it turns the Phase 0
+  plan into exact A/B/C preflight, worker, coordinator, validation, and
+  publication commands.
 - The routing-payload scaffold is not target-hardware transport evidence, measured copy-count telemetry, or DS5-F002 runtime progress.
 
 ## Rigid Acceptance Criteria
@@ -34,6 +45,8 @@ Existing implementation signals:
 - Artifacts report p50/p95/p99 latency by message size.
 - Artifacts report sustained throughput by block size.
 - Artifacts report scheduler overhead per simulated token.
+- Artifacts report control-plane overhead or explicitly state when scheduler
+  overhead is the current control-plane proxy.
 - Artifacts report bytes sent per simulated token and per-layer simulated transport time.
 - Artifacts report concurrent A-B and A-C interference.
 - Artifacts report checksum failures, reconnect behavior, and worker health.
@@ -56,6 +69,8 @@ The merge request must attach or reference:
 - Any performance claim that omits p95/p99 latency or scheduler overhead.
 - Any transport result without checksummed artifacts.
 - Any move into fused routing, tokenizer, prefetch, model loading, or Metal kernels before this feature reaches a clear go/no-go.
+- Any use of SSD/NVMe measurements as proof that active decode can depend on
+  storage in the steady-state hot path.
 
 ## Artifact Readiness Gate
 
