@@ -48,9 +48,11 @@ They do not prove runtime memory conformance, worker startup ownership, real Qwe
 ## DS5-F000 Required Work
 
 - Run real A/B/C transport measurements on the target hardware topology.
+- Keep the runtime roles explicit: Node A is the M5 Pro orchestrator/control plane; Nodes B and C are M5 Max synthetic LLM data-plane workers.
 - Emit `run.json`, `events.jsonl`, `latency.csv`, `throughput.csv`, and `summary.md`.
-- Report p50/p95/p99 latency, throughput by block size, jitter, checksum failures, scheduler overhead, concurrent A-B/A-C interference, reconnect behavior, and projected decode impact.
+- Report p50/p95/p99 latency, throughput by block size, jitter, checksum failures, scheduler/control-plane overhead, concurrent A-B/A-C interference, reconnect behavior, and projected decode impact.
 - Decide whether to proceed, redesign packetization, reduce remote movement assumptions, or publish a negative transport finding.
+- Keep model-independent SSD/NVMe measurements as optional adjunct evidence only; they do not unblock active decode-path or storage-dependent runtime claims.
 
 ## DS5-F001B Required Work
 

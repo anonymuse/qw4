@@ -16,8 +16,15 @@ sequence are ready to collect evidence for:
 - reconnect, retry, timeout, and worker-health behavior;
 - projected decode impact from transport-derived remote expert-rate sweeps.
 
+The refined Phase 0 question is:
+
+> Can an M5 Pro orchestrator agent keep two M5 Max synthetic LLM data-plane workers fed with Qwen3-shaped activation/result traffic without transport, scheduling, or control-plane overhead dominating decode-shaped work?
+
 This runbook does not record a target-hardware finding. Loopback, localhost, and
 fixture evidence remain scaffolding only.
+
+Use [DS5-F000 Cluster Operator Packet](ds5-f000-cluster-operator-packet.md) for
+the exact A/B/C cluster procedure when the hardware is available.
 
 ## Readiness Audit
 
@@ -25,6 +32,7 @@ fixture evidence remain scaffolding only.
 |---|---|---|
 | Required artifact set | `tools/report/validate_run.py` requires `run.json`, `events.jsonl`, `latency.csv`, `throughput.csv`, and `summary.md`. | Ready for validation. |
 | A/B/C topology | `run.json` must include node A as coordinator and nodes B/C as workers. | Ready for validation. |
+| Role split | Run notes must identify A as M5 Pro orchestrator/control plane and B/C as M5 Max synthetic LLM data-plane workers. | Ready for operator packet. |
 | Qwen-shaped traffic | `run.json.scenario.qwen_shape` must match 94 layers, hidden size 4096, top-k 8, B layers 0-46, C layers 47-93. | Ready for validation. |
 | Latency percentiles | Run-level latency metrics and `latency.csv` must cover every scenario message size for A-B and A-C with p50/p95/p99 ordering. | Ready for validation. |
 | Throughput sweep | Run-level throughput metrics and solo `throughput.csv` rows must cover every scenario block size for A-B and A-C. | Ready for validation. |
@@ -89,6 +97,7 @@ Confirmed network path: <Thunderbolt Bridge / Ethernet / other>
 Wi-Fi fallback disabled or ruled out: <yes/no and evidence>
 Clock sync note: <NTP / manual check / other>
 Power mode and background load notes: <notes>
+Artifact label: <ds5-f000-abc-YYYYMMDD-or-ticket>
 ```
 
 If the path cannot be confirmed as non-loopback and non-localhost, run artifacts
@@ -102,7 +111,7 @@ final command lines into the finding.
 On worker B:
 
 ```bash
-git checkout codex/ds5-f000-artifact-readiness
+git checkout <branch-or-commit-used-for-all-three-nodes>
 git rev-parse HEAD
 zig build run-worker -- --node B --listen 0.0.0.0:7555
 ```
@@ -110,7 +119,7 @@ zig build run-worker -- --node B --listen 0.0.0.0:7555
 On worker C:
 
 ```bash
-git checkout codex/ds5-f000-artifact-readiness
+git checkout <branch-or-commit-used-for-all-three-nodes>
 git rev-parse HEAD
 zig build run-worker -- --node C --listen 0.0.0.0:7556
 ```
@@ -188,3 +197,11 @@ Loopback or socket-localhost runs are useful only for:
 - command ergonomics before target hardware is available.
 
 They cannot answer the DS5-F000 go/no-go question.
+
+## SSD/NVMe Adjunct Rule
+
+Model-independent SSD/NVMe measurements may be useful before later cold
+backing, promotion, artifact movement, or long-context work. Keep them in a
+separate artifact directory and summary. Do not cite them as Phase 0
+distributed-decode evidence, and do not use them to justify a steady-state
+active-weight decode path that depends on storage.
